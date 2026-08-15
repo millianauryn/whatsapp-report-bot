@@ -1,0 +1,14 @@
+[Unit]
+Description=WhatsApp Report Bot
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/hidup-mulyono/whatsapp-report-bot
+ExecStart=/usr/bin/node index.js
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
