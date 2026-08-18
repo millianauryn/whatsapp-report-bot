@@ -1,5 +1,6 @@
 node_modules/
 auth_info/
+auth.key
 data.json
 data.json.tmp
 bot.lock

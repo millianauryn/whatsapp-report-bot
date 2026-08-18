@@ -1,16 +1,55 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { makeSock, BOT_JID, G1, ADMIN, MEMBER_A, MEMBER_B, GROUPS } from './helpers.js'
+import { makeSock, BOT_JID, G1, G2, ADMIN, MEMBER_A, MEMBER_B, GROUPS, cleanup } from './helpers.js'
 import * as bot from '../src/bot.js'
+import * as db from '../src/db.js'
 
-test('inviteCodeFromLink: berbagai format link/kode', () => {
-  assert.equal(bot.inviteCodeFromLink('https://chat.whatsapp.com/AbCdEfGh1234567'), 'AbCdEfGh1234567')
-  assert.equal(bot.inviteCodeFromLink('chat.whatsapp.com/AbCdEfGh1234567'), 'AbCdEfGh1234567')
-  assert.equal(bot.inviteCodeFromLink('AbCdEfGh1234567'), 'AbCdEfGh1234567')
-  assert.equal(bot.inviteCodeFromLink('https://chat.whatsapp.com/?code=AbCdEfGh1234567'), 'AbCdEfGh1234567')
-  assert.equal(bot.inviteCodeFromLink('https://example.com/abc'), null, 'domain lain ditolak')
-  assert.equal(bot.inviteCodeFromLink('pendek'), null, 'kode terlalu pendek')
+db.load()
+
+test.after(() => cleanup())
+
+test('registerGroup/unregisterGroup: daftar grup bertambah & berkurang', () => {
+  db.set('meta', 'groups', [G2])
+  bot.registerGroup(G1)
+  assert.deepEqual(db.get('meta', 'groups', []), [G2, G1])
+  bot.unregisterGroup(G1)
+  assert.deepEqual(db.get('meta', 'groups', []), [G2], 'grup yang dihapus tidak lagi dilayani')
+})
+
+test('shouldServeGroup: hanya grup yang terdaftar', () => {
+  db.set('meta', 'groups', [G1])
+  assert.equal(bot.shouldServeGroup(G1), true)
+  assert.equal(bot.shouldServeGroup(G2), false)
+})
+
+test('inviteCodeFromLink: link penuh atau kode polos', () => {
+  assert.equal(bot.inviteCodeFromLink('https://chat.whatsapp.com/HSFrpubAAEZBBfYGYWv8cV'), 'HSFrpubAAEZBBfYGYWv8cV')
+  assert.equal(bot.inviteCodeFromLink('HSFrpubAAEZBBfYGYWv8cV'), 'HSFrpubAAEZBBfYGYWv8cV')
+  assert.equal(bot.inviteCodeFromLink('https://example.com/abc'), null)
+  assert.equal(bot.inviteCodeFromLink('pendek'), null)
   assert.equal(bot.inviteCodeFromLink(''), null)
+})
+
+test('joinAllowedGroups: join via link -> terdaftar + tidak di-join ulang; link invalid -> dilewati', async () => {
+  const sock = makeSock()
+  db.set('meta', 'groups', [])
+  db.del('meta', 'joined_links')
+
+  const links = [
+    'https://chat.whatsapp.com/HSFrpubAAEZBBfYGYWv8cV',
+    'https://example.com/gagal',
+  ]
+  await bot.joinAllowedGroups(sock, links)
+
+  assert.deepEqual(db.get('meta', 'groups', []), [G1], 'grup dari link diizinkan terdaftar')
+  assert.deepEqual(db.get('meta', 'joined_links', {}), { HSFrpubAAEZBBfYGYWv8cV: G1 }, 'pemetaan kode->gid tersimpan')
+  const invites = sock.sent.filter((s) => s.content.invite)
+  assert.equal(invites.length, 1, 'hanya satu percobaan join')
+
+  db.set('meta', 'groups', [])
+  await bot.joinAllowedGroups(sock, links)
+  assert.deepEqual(db.get('meta', 'groups', []), [G1], 'join ulang tidak perlu, grup dipulihkan dari joined_links')
+  assert.equal(sock.sent.filter((s) => s.content.invite).length, 1, 'tidak join ulang')
 })
 
 test('isGroupAdmin: admin & superadmin, bukan anggota biasa', () => {
@@ -35,6 +74,18 @@ test('nonReporters: yang belum lapor, tanpa bot & admin', () => {
   assert.deepEqual(due.map((p) => p.id), [MEMBER_B])
 })
 
+test('captureName: mengisi bila kosong, tidak menimpa nama lapor', () => {
+  db.del('names', MEMBER_A)
+  assert.equal(bot.captureName(db, MEMBER_A, 'Nama WA'), true, 'pushName mengisi saat kosong')
+  assert.equal(db.get('names', MEMBER_A), 'Nama WA')
+
+  db.set('names', MEMBER_B, 'Budi Santoso')
+  assert.equal(bot.captureName(db, MEMBER_B, 'Nama WA Lain'), false, 'nama lapor tidak tertimpa')
+  assert.equal(db.get('names', MEMBER_B), 'Budi Santoso', 'nama lapor tetap dipertahankan')
+
+  assert.equal(bot.captureName(db, G2, '   '), false, 'pushName kosong diabaikan')
+})
+
 test('isController: nomor bot selalu lolos, admin grup terdaftar lolos, orang luar tidak', async () => {
   const sock = makeSock()
   assert.equal(await bot.isController(sock, [G1], BOT_JID), true)
@@ -49,14 +100,6 @@ test('extractText: conversation & extendedTextMessage & caption', () => {
   assert.equal(bot.extractText({ message: { imageMessage: { caption: '!status' } } }), '!status')
   assert.equal(bot.extractText({ message: {} }), '')
   assert.equal(bot.extractText({}), '')
-})
-
-test('joinGroupByInvite & leaveGroup: memanggil API socket', async () => {
-  const sock = makeSock()
-  const gid = await bot.joinGroupByInvite(sock, 'https://chat.whatsapp.com/AbCdEfGh1234567')
-  assert.equal(gid, G1)
-  await bot.leaveGroup(sock, G1)
-  assert.ok(sock.sent.some((s) => s.content.left === true))
 })
 
 test('sendText/sendMention/reply: mengirim lewat socket', async () => {

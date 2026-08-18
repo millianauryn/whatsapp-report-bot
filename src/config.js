@@ -26,29 +26,41 @@ function timezone(val) {
   }
 }
 
-const DEADLINE_RE = /^([A-Za-z]+)\s+(\d{1,2}):(\d{2})$/
+const DEADLINE_RE = /^(?:([A-Za-z]+)\s+)?(\d{1,2}):(\d{2})$/
 const DAYS = new Set([
   'senin', 'selasa', 'rabu', 'kamis', 'jumat', 'sabtu', 'minggu',
   'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday',
 ])
 
-/** Format tenggat valid (hari dikenal + jam <= 23 + menit <= 59); perbaiki otomatis bila tidak. */
+/** Format tenggat valid: "21:00" (setiap hari) atau "Jumat 21:00" (1x seminggu). */
 function deadline(val) {
   const m = String(val).trim().match(DEADLINE_RE)
-  if (m && DAYS.has(m[1].toLowerCase()) && Number(m[2]) <= 23 && Number(m[3]) <= 59) return val
-  console.log(`[config] deadline: ${JSON.stringify(val)} -> Jumat 21:00 (otomatis diperbaiki)`)
-  return 'Jumat 21:00'
+  if (m && (!m[1] || DAYS.has(m[1].toLowerCase())) && Number(m[2]) <= 23 && Number(m[3]) <= 59) return val
+  console.log(`[config] deadline: ${JSON.stringify(val)} -> 21:00 (otomatis diperbaiki)`)
+  return '21:00'
+}
+
+const INVITE_RE = /^(?:https:\/\/chat\.whatsapp\.com\/)?([A-Za-z0-9_-]{15,})$/
+
+/** Daftar link undangan grup yang diizinkan; link tidak valid dibuang. */
+function allowedGroupLinks(val) {
+  const links = Array.isArray(val) ? val : []
+  const ok = links.filter((l) => INVITE_RE.test(String(l).trim()))
+  if (ok.length !== links.length) {
+    console.log(`[config] allowed_group_links: ${links.length - ok.length} link tidak valid, dibuang`)
+  }
+  return ok
 }
 
 /** Validasi & perbaikan otomatis seluruh isi config. Dipakai saat start dan oleh test. */
 export function validateConfig(raw) {
   return {
-    deadline: deadline(raw.deadline ?? 'Jumat 21:00'),
+    deadline: deadline(raw.deadline ?? '21:00'),
     timezone: timezone(raw.timezone ?? 'Asia/Makassar'),
     reminder_minutes_before: number(raw.reminder_minutes_before, 60, 1, 'reminder_minutes_before'),
     check_interval_seconds: number(raw.check_interval_seconds, 30, 10, 'check_interval_seconds'),
     exclude_admins: raw.exclude_admins !== false,
-    auto_join_groups: Array.isArray(raw.auto_join_groups) ? raw.auto_join_groups : [],
+    allowed_group_links: allowedGroupLinks(raw.allowed_group_links),
     data_file: raw.data_file || 'data.json',
     auth_dir: raw.auth_dir || 'auth_info',
   }

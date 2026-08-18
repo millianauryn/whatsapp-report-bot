@@ -1,4 +1,5 @@
-import makeWASocket, { useMultiFileAuthState, DisconnectReason } from '@whiskeysockets/baileys'
+import makeWASocket, { DisconnectReason } from '@whiskeysockets/baileys'
+import { useEncryptedAuthState } from './authState.js'
 import path from 'node:path'
 import { config } from './config.js'
 import * as db from './db.js'
@@ -56,6 +57,17 @@ export function nonReporters(myJid, meta, reports = {}) {
   })
 }
 
+/** Nama per nomor: nama dari !lapor selalu menang; nama WhatsApp (pushName)
+ * hanya mengisi bila belum ada nama tersimpan — tidak pernah menimpa. */
+export function captureName(dbStore, jid, pushName) {
+  const name = (pushName || '').trim()
+  if (name && !dbStore.get('names', jid, '')) {
+    dbStore.set('names', jid, name)
+    return true
+  }
+  return false
+}
+
 export function registerGroup(gid) {
   const groups = db.get('meta', 'groups', [])
   if (!groups.includes(gid)) {
@@ -65,27 +77,54 @@ export function registerGroup(gid) {
   }
 }
 
+export function unregisterGroup(gid) {
+  const groups = db.get('meta', 'groups', [])
+  if (groups.includes(gid)) {
+    db.set('meta', 'groups', groups.filter((g) => g !== gid))
+    console.log(`[bot] Grup dihapus dari daftar: ${gid}`)
+  }
+}
+
+/** True jika grup ada di daftar grup yang diizinkan (meta.groups). */
+export function shouldServeGroup(gid) {
+  return db.get('meta', 'groups', []).includes(gid)
+}
+
 /** Ekstrak kode undangan dari link (atau kode polos) untuk chat.whatsapp.com. */
 export function inviteCodeFromLink(input) {
-  const raw = String(input).trim()
-  if (!raw) return null
-  const parts = raw.split(/[/=?#\s]+/).filter(Boolean)
-  const last = parts[parts.length - 1]
-  if (/^[A-Za-z0-9_-]{15,}$/.test(last)) return last
-  if (/^[A-Za-z0-9_-]{15,}$/.test(raw)) return raw
-  return null
+  const m = String(input).trim().match(/^(?:https:\/\/chat\.whatsapp\.com\/)?([A-Za-z0-9_-]{15,})$/)
+  return m ? m[1] : null
 }
 
-/** Gabung grup via link undangan; mengembalikan JID grup. */
-export async function joinGroupByInvite(sock, input) {
-  const code = inviteCodeFromLink(input)
-  if (!code) throw new Error('Kode undangan tidak ditemukan pada link tersebut')
-  return sock.groupAcceptInvite(code)
-}
-
-/** Keluar dari grup. */
-export async function leaveGroup(sock, gid) {
-  await sock.groupLeave(gid)
+/**
+ * Join & daftarkan hanya grup dari link yang diizinkan (config.allowed_group_links).
+ * Grup sudah pernah di-join (meta.joined_links) tidak di-join ulang, hanya
+ * dipastikan tetap terdaftar.
+ */
+export async function joinAllowedGroups(sock, links = config.allowed_group_links) {
+  const joined = db.get('meta', 'joined_links', {})
+  for (const link of links || []) {
+    const code = inviteCodeFromLink(link)
+    if (!code) {
+      console.log(`[join] GAGAL ${link} - link tidak dikenali`)
+      continue
+    }
+    const existing = joined[code]
+    if (existing) {
+      registerGroup(existing)
+      console.log(`[join] ${existing} sudah terdaftar dari link ${code}`)
+      continue
+    }
+    try {
+      const gid = await sock.groupAcceptInvite(code)
+      joined[code] = gid
+      db.set('meta', 'joined_links', joined)
+      registerGroup(gid)
+      console.log(`[join] OK ${link} - masuk grup ${gid}`)
+    } catch (err) {
+      console.log(`[join] GAGAL ${link} - ${err?.message || 'link tidak valid/kedaluwarsa'}`)
+    }
+  }
 }
 
 export async function sendText(sock, jid, text, quoted) {
@@ -120,7 +159,7 @@ export async function createBot(handlers) {
   const authDir = path.join(process.cwd(), config.auth_dir)
 
   async function connect() {
-    const { state, saveCreds } = await useMultiFileAuthState(authDir)
+    const { state, saveCreds } = await useEncryptedAuthState(authDir)
     sock = makeWASocket({ auth: state, markOnlineOnConnect: false })
 
     sock.ev.on('creds.update', saveCreds)
@@ -164,9 +203,16 @@ export async function createBot(handlers) {
     })
 
     sock.ev.on('group-participants.update', (u) => {
-      if (u.action === 'add' && u.participants.includes(botJidOf(sock))) {
+      if (!u.participants.includes(botJidOf(sock))) return
+      if (u.action === 'add') {
+        // Hanya grup dari link yang diizinkan yang dilayani; ditambahkan langsung -> diabaikan.
+        if (!shouldServeGroup(u.id)) {
+          console.log(`[bot] Grup tidak diizinkan, diabaikan: ${u.id}`)
+          return
+        }
         registerGroup(u.id)
       }
+      if (u.action === 'remove') unregisterGroup(u.id)
     })
   }
 

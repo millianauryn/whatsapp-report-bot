@@ -22,16 +22,12 @@ export default [
       }
 
       const now = new Date()
-      const period = time.periodId(now)
-      const reports = db.get('reports', period, {})
       const groupIds = m.isGroup ? [m.jid] : db.get('meta', 'groups', [])
       if (groupIds.length === 0) {
         return reply(sock, m, 'Belum ada grup yang terdaftar. Tambahkan bot ke grup atau gunakan !join <link>.')
       }
 
       const myJid = botJidOf(sock)
-      const deadlineText = time.formatDeadline()
-      const range = time.formatRange(period)
       const parts = []
 
       for (const gid of groupIds) {
@@ -41,19 +37,35 @@ export default [
         } catch {
           continue
         }
+
+        const schedule = time.groupSchedule(gid)
+        const state = time.scheduleState(now, schedule)
+        const lines = []
+        if (groupIds.length > 1) {
+          lines.push(`*Grup: ${meta.subject || gid}*`)
+          lines.push('')
+        }
+
+        if (!state) {
+          const next = time.nextPeriodInfo(now, schedule)
+          lines.push(`*Cek Laporan - ${time.describeSchedule(schedule)}*`)
+          lines.push(next
+            ? `Periode belum dibuka. Jadwal berikutnya: ${next.periodLabel} (tenggat ${next.deadlineText} WITA).`
+            : 'Periode belum dibuka. Cek jadwal dengan !tenggat.')
+          parts.push({ gid, lines, mentions: [] })
+          continue
+        }
+
+        const reports = db.get('reports', state.periodId, {})[gid] || {}
         const due = nonReporters(myJid, meta, reports)
         const memberIds = new Set(memberParticipants(meta, myJid).map((p) => p.id))
         const done = Object.entries(reports)
           .filter(([jid]) => memberIds.has(jid))
           .map(([, r]) => r)
 
-        const lines = []
-        if (groupIds.length > 1) {
-          lines.push(`*Grup: ${meta.subject || gid}*`)
-          lines.push('')
-        }
-        lines.push(`*Cek Laporan - Periode ${range}*`)
-        lines.push(`Tenggat: ${deadlineText} WITA`)
+        lines.push(`*Cek Laporan - Periode ${state.periodLabel}*`)
+        lines.push(`Jadwal: ${time.describeSchedule(schedule)}`)
+        lines.push(`Tenggat: ${state.deadlineText} WITA`)
         lines.push('')
         lines.push(`Sudah lapor (${done.length}):`)
         lines.push(done.length ? done.map((r) => `✅ ${r.name}`).join('\n') : '  -')

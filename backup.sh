@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 # Backup harian bot laporan WhatsApp: data.json + sesi WhatsApp (auth_info).
+# Sesi tersimpan terenkripsi (session.enc) sehingga aman dibackup;
+# KUNCI (auth.key) TIDAK PERNAH dibackup — tanpanya backup sesi tidak bisa dipakai.
 # Simpan 7 hari terakhir, hapus yang lebih lama.
 set -euo pipefail
 
@@ -10,7 +12,7 @@ KEEP=7
 
 mkdir -p "$OUT"
 
-if tar -czf "$OUT/report-bot-$STAMP.tar.gz" -C "$DIR" data.json auth_info 2>/dev/null; then
+if tar -czf "$OUT/report-bot-$STAMP.tar.gz" -C "$DIR" --exclude=auth_info/auth.key data.json auth_info 2>/dev/null; then
   :
 else
   # fallback: backup data saja bila sesi bermasalah

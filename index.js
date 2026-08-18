@@ -8,6 +8,7 @@ import { loadCommands, loadJobs } from './src/registry.js'
 import { startScheduler } from './src/scheduler.js'
 import { initLogger } from './src/logger.js'
 import { checkPermissionSafe } from './src/permissions.js'
+import { migrateData } from './src/migrate.js'
 
 const COMMAND_PREFIX = '!'
 const LOCK_FILE = 'bot.lock'
@@ -53,37 +54,7 @@ function normalizePhone(phone) {
   return digits
 }
 
-/** Gabung otomatis ke grup-grup di config.auto_join_groups (dicek 1x per link). */
-async function processAutoJoin(sock) {
-  const links = config.auto_join_groups || []
-  if (links.length === 0) return
-
-  const done = db.get('joined_invites', 'list', [])
-  const logger = async (link, ok, extra = '') => {
-    console.log(`[autojoin] ${ok ? 'OK' : 'GAGAL'} ${link}${extra ? ` - ${extra}` : ''}`)
-  }
-
-  for (const link of links) {
-    const code = bot.inviteCodeFromLink(link)
-    if (!code) {
-      await logger(link, false, 'link tidak dikenali')
-      continue
-    }
-    if (done.includes(code)) {
-      await logger(link, true, 'sudah pernah diproses')
-      continue
-    }
-    try {
-      const gid = await bot.joinGroupByInvite(sock, link)
-      bot.registerGroup(gid)
-      done.push(code)
-      db.set('joined_invites', 'list', done)
-      await logger(link, true, `masuk grup ${gid}`)
-    } catch (err) {
-      await logger(link, false, err?.message || 'link tidak valid/kedaluwarsa')
-    }
-  }
-}
+/** Gabung grup: hanya saat bot ditambahkan langsung ke grup (lihat src/bot.js). */
 
 async function main() {
   acquireLock()
@@ -95,7 +66,7 @@ async function main() {
   const jobs = await loadJobs()
 
   console.log('[bot] Bot Laporan WhatsApp dimulai...')
-  console.log(`[bot] Zona waktu: ${config.timezone} | Tenggat default: ${config.deadline}`)
+  console.log(`[bot] Zona waktu: ${config.timezone} | Jadwal default: ${config.deadline}`)
   console.log('[bot] Ctrl+C untuk berhenti')
 
   const appCtx = {
@@ -114,7 +85,9 @@ async function main() {
     },
     onOpen(sock) {
       console.log(`[bot] Login sebagai: ${bot.botJidOf(sock)}`)
-      void processAutoJoin(sock)
+      // Hanya grup dari link yang diizinkan yang di-join & dilayani.
+      void bot.joinAllowedGroups(sock)
+      void migrateData(sock).catch((err) => console.error('[migrate] Gagal migrasi data:', err?.message))
     },
     onMessage(sock, m) {
       if (!m.message) return
@@ -124,11 +97,9 @@ async function main() {
       const sender = m.key.participant || jid
       const pushName = (m.pushName || '').trim()
 
-      // Simpan nama & daftarkan grup untuk SEMUA pesan, bukan hanya perintah.
-      if (pushName && db.get('names', sender, '') !== pushName) {
-        db.set('names', sender, pushName)
-      }
-      if (isGroup) bot.registerGroup(jid)
+      // Nama per nomor: nama dari !lapor selalu menang; nama WhatsApp hanya
+      // mengisi bila belum ada nama tersimpan (tidak pernah menimpa).
+      bot.captureName(db, sender, m.pushName)
 
       const text = bot.extractText(m)
       if (!text || !text.startsWith(COMMAND_PREFIX)) return

@@ -46,3 +46,8 @@ export function clear(name) {
   data.collections[name] = {}
   save()
 }
+
+/** Daftar semua kunci pada sebuah koleksi. */
+export function keys(name) {
+  return Object.keys(col(name))
+}

@@ -7,7 +7,7 @@ import path from 'node:path'
 const dir = mkdtempSync(path.join(tmpdir(), 'db-test-'))
 process.env.BOT_DATA_FILE = path.join(dir, 'data.json')
 
-const { load, get, set, del, clear, save } = await import('../src/db.js')
+const { load, get, set, del, clear, save, keys } = await import('../src/db.js')
 
 test('load: file kosong/belum ada -> dibuat', () => {
   load()
@@ -27,6 +27,13 @@ test('persistensi: tersimpan ke file, terbaca setelah load ulang', () => {
   set('names', '6281111@s.whatsapp.net', 'Budi')
   const raw = JSON.parse(readFileSync(process.env.BOT_DATA_FILE, 'utf8'))
   assert.equal(raw.collections.names['6281111@s.whatsapp.net'], 'Budi')
+})
+
+test('keys: daftar kunci koleksi', () => {
+  set('reports', '2026-08-17', { a: 1 })
+  set('reports', '2026-09-01', { b: 2 })
+  assert.deepEqual(keys('reports').sort(), ['2026-08-17', '2026-09-01'])
+  assert.deepEqual(keys('kosong'), [])
 })
 
 test('clear: koleksi dikosongkan', () => {
