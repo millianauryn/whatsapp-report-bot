@@ -4,3 +4,4 @@ data.json
 data.json.tmp
 bot.lock
 *.log
+backups/

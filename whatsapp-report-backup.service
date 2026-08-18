@@ -1,0 +1,7 @@
+[Unit]
+Description=Backup data bot laporan WhatsApp (data.json + auth_info)
+After=network.target
+
+[Service]
+Type=oneshot
+ExecStart=/home/hidup-mulyono/whatsapp-report-bot/backup.sh

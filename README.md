@@ -98,6 +98,14 @@ periode baru  ───────►  DM "jangan lupa lapor"  ───►  DM
                        (ke yang belum lapor, 1x)     (ke yang belum lapor, 1x)
 ```
 
+## Testing
+
+```bash
+npm test
+```
+
+66 test otomatis (node:test, tanpa dependency tambahan) mencakup: validasi config, logika waktu WITA, penyimpanan db, izin perintah (admin/master/DM), helper bot, seluruh handler (`!lapor`, `!status`, `!check`, `!tenggat`, `!reset`, `!alert`, `!alertdm`, `!join`, `!leave`, `!grup`, `!bantuan`), dan semua job terjadwal (reminder, deadlineAlert, weeklyReset). Test memakai socket tiruan + file db sementara — tidak menyentuh WhatsApp.
+
 ## Menambah Fitur Baru (sustainable)
 
 Perintah: buat file baru di `src/handlers/`, contoh `src/handlers/absen.js`:

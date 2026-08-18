@@ -1,0 +1,9 @@
+[Unit]
+Description=Backup harian bot laporan WhatsApp (tiap hari 00:00 WITA)
+
+[Timer]
+OnCalendar=*-*-* 00:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target

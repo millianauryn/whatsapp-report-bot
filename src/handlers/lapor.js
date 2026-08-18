@@ -3,7 +3,7 @@ import { reply, isController } from '../bot.js'
 const USAGE = '!lapor <nama> - <keterangan>'
 const EXAMPLE = 'Contoh: !lapor Budi Santoso - Menyelesaikan laporan mingguan\nKeterangan boleh dikosongkan: !lapor Budi Santoso'
 
-function parseLapor(text) {
+export function parseLapor(text) {
   const m = text.match(/^([\s\S]*?)\s*-\s*([\s\S]+)$/)
   if (m) {
     const name = m[1].trim()

@@ -1,7 +1,7 @@
 import { readFileSync, writeFileSync, renameSync } from 'node:fs'
 import { config } from './config.js'
 
-const file = config.data_file
+const file = process.env.BOT_DATA_FILE || config.data_file
 const data = { collections: {} }
 
 export function load() {

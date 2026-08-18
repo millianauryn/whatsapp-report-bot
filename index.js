@@ -6,6 +6,8 @@ import * as time from './src/time.js'
 import * as bot from './src/bot.js'
 import { loadCommands, loadJobs } from './src/registry.js'
 import { startScheduler } from './src/scheduler.js'
+import { initLogger } from './src/logger.js'
+import { checkPermissionSafe } from './src/permissions.js'
 
 const COMMAND_PREFIX = '!'
 const LOCK_FILE = 'bot.lock'
@@ -85,6 +87,7 @@ async function processAutoJoin(sock) {
 
 async function main() {
   acquireLock()
+  initLogger()
 
   db.load()
 
@@ -143,17 +146,6 @@ async function main() {
       const cmd = commands.get(word.toLowerCase())
       if (!cmd) return
 
-      const checkPermission = async () => {
-        if (cmd.permission !== 'admin') return true
-        if (sender === bot.botJidOf(sock)) return true
-        if (!isGroup) {
-          const groups = db.get('meta', 'groups', [])
-          return bot.isController(sock, groups, sender)
-        }
-        const meta = await bot.groupMeta(sock, jid)
-        return bot.isGroupAdmin(meta, sender)
-      }
-
       const msg = {
         jid,
         isGroup,
@@ -164,7 +156,7 @@ async function main() {
         args: args.join(' ').trim(),
       }
 
-      checkPermission().then(async (ok) => {
+      checkPermissionSafe(cmd, msg, sock).then(async (ok) => {
         if (!ok) {
           await safeReply(sock, msg, 'Akses ditolak. Perintah ini hanya untuk admin grup.')
           return

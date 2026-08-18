@@ -1,8 +1,8 @@
 {
   "deadline": "Jumat 21:00",
   "timezone": "Asia/Makassar",
-  "reminder_minutes_before": 0,
-  "check_interval_seconds": 0,
+  "reminder_minutes_before": 60,
+  "check_interval_seconds": 30,
   "exclude_admins": true,
   "auto_join_groups": [],
   "data_file": "data.json",
