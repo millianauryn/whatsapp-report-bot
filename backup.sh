@@ -12,12 +12,9 @@ KEEP=7
 
 mkdir -p "$OUT"
 
-if tar -czf "$OUT/report-bot-$STAMP.tar.gz" -C "$DIR" --exclude=auth_info/auth.key data.json auth_info 2>/dev/null; then
-  :
-else
-  # fallback: backup data saja bila sesi bermasalah
-  tar -czf "$OUT/report-bot-$STAMP.tar.gz" -C "$DIR" data.json
-fi
+# fallback: backup data saja bila sesi bermasalah
+tar -czf "$OUT/report-bot-$STAMP.tar.gz" -C "$DIR" --exclude=auth_info/auth.key data.json auth_info \
+  || tar -czf "$OUT/report-bot-$STAMP.tar.gz" -C "$DIR" data.json
 
 find "$OUT" -name 'report-bot-*.tar.gz' -mtime +"$KEEP" -delete
 

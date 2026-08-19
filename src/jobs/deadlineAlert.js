@@ -1,4 +1,4 @@
-import { groupMeta, botJidOf, nonReporters, sendText, sendMention, memberParticipants } from '../bot.js'
+import { groupMeta, botJidOf, nonReporters, sendText, sendMention, memberParticipants, reportListLines } from '../bot.js'
 
 function recapLines(state, done, due, db, header, doneLabel = 'Sudah lapor') {
   return [
@@ -6,11 +6,7 @@ function recapLines(state, done, due, db, header, doneLabel = 'Sudah lapor') {
     `Jadwal: ${state.cadenceLabel}`,
     `Tenggat: ${state.deadlineText} WITA`,
     '',
-    `${doneLabel} (${done.length}):`,
-    done.length ? done.map((r) => `✅ ${r.name}${r.late ? ' (terlambat)' : ''}`).join('\n') : '  -',
-    '',
-    `Belum lapor (${due.length}):`,
-    due.length ? due.map((p) => `❌ ${db.get('names', p.id, '') || p.id.split('@')[0]}`).join('\n') : '  -',
+    ...reportListLines(done, due, db, doneLabel),
   ]
 }
 
@@ -83,7 +79,7 @@ export default {
           '',
           'Halo{nama}, kamu BELUM mengirim laporan dan tenggat ({tenggat} WITA) sudah lewat.',
           '',
-          'Kamu masih bisa kirim laporan (akan ditandai terlambat):',
+          'Kamu masih bisa kirim laporan:',
           '!lapor <nama>',
         ].join('\n')
         const template = custom || defaultText
@@ -125,7 +121,8 @@ export default {
         if (next) lines.push(`Laporan berikutnya: ${next.periodLabel} (tenggat ${next.deadlineText} WITA).`)
       }
       try {
-        await sendMention(sockObj, gid, lines.join('\n'), due.map((p) => p.id))
+        // Check otomatis = list saja, tanpa mention.
+        await sendText(sockObj, gid, lines.join('\n'))
       } catch (err) {
         console.error(`[deadlineAlert] Gagal kirim summary di ${gid}:`, err?.message)
       }

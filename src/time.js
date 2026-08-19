@@ -14,11 +14,6 @@ const MONTHS = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 
 
 const EN_DAY = { Sun: 6, Mon: 0, Tue: 1, Wed: 2, Thu: 3, Fri: 4, Sat: 5 }
 
-/** Senin 2026-01-05 = acuan tetap minggu genap/ganjil untuk jadwal 2 mingguan. */
-const FORTNIGHT_EPOCH = realInstantOf(2026, 1, 5, 0, 0)
-
-const FIELDS = ['year', 'month', 'day', 'weekday', 'hour', 'minute', 'second']
-
 export function localFields(date = new Date()) {
   const dtf = new Intl.DateTimeFormat('en-CA', {
     timeZone: config.timezone,
@@ -95,12 +90,7 @@ export function parseDeadline(str) {
   return { day, hour, minute }
 }
 
-/** Tenggat yang sedang berlaku global (default config). */
-export function resolvedDeadline() {
-  return db.get('deadline', 'override', null) || config.deadline
-}
-
-export function formatDeadline(str = resolvedDeadline()) {
+export function formatDeadline(str = config.deadline) {
   const p = parseDeadline(str)
   if (!p) return str
   const t = formatTime(p.hour, p.minute)
@@ -109,10 +99,6 @@ export function formatDeadline(str = resolvedDeadline()) {
 
 function formatTime(hour, minute) {
   return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`
-}
-
-function daysInMonth(year, month) {
-  return new Date(Date.UTC(year, month, 0)).getUTCDate()
 }
 
 function rangeLabel(startInstant, endExclusiveInstant) {
@@ -132,59 +118,14 @@ export function formatDateLabel(date) {
 const CADENCE_LABEL = {
   daily: 'harian',
   weekly: 'mingguan',
-  biweekly: '2 mingguan',
   semimonthly: '2x sebulan',
-  monthly: 'bulanan',
 }
 
-/**
- * Parsing argumen !tenggat:
- *   "21:00" | "harian 21:00"               -> daily
- *   "Jumat 21:00" | "mingguan Jumat 21:00" -> weekly
- *   "2minggu Jumat 21:00"                  -> biweekly
- *   "2xsebulan 11:30"                      -> semimonthly (cycle 1-4 & 15-18)
- *   "bulanan 5 11:30"                      -> monthly (tiap tanggal 5)
- */
-export function parseScheduleText(str) {
-  const s = String(str).trim()
-  if (!s) return null
-
-  let m = s.match(/^(?:harian\s+)?(\d{1,2}):(\d{2})$/)
-  if (m && Number(m[1]) <= 23 && Number(m[2]) <= 59) {
-    return { cadence: 'daily', deadline: formatTime(m[1], m[2]) }
-  }
-
-  m = s.match(/^(?:mingguan\s+)?([A-Za-z]+)\s+(\d{1,2}):(\d{2})$/)
-  if (m && DAY_INDEX[m[1].toLowerCase()] !== undefined && Number(m[2]) <= 23 && Number(m[3]) <= 59) {
-    return { cadence: 'weekly', deadline: `${DAY_NAMES[DAY_INDEX[m[1].toLowerCase()]]} ${formatTime(m[2], m[3])}` }
-  }
-
-  m = s.match(/^2minggu\s+([A-Za-z]+)\s+(\d{1,2}):(\d{2})$/)
-  if (m && DAY_INDEX[m[1].toLowerCase()] !== undefined && Number(m[2]) <= 23 && Number(m[3]) <= 59) {
-    return { cadence: 'biweekly', deadline: `${DAY_NAMES[DAY_INDEX[m[1].toLowerCase()]]} ${formatTime(m[2], m[3])}` }
-  }
-
-  m = s.match(/^2xsebulan\s+(\d{1,2}):(\d{2})$/)
-  if (m && Number(m[1]) <= 23 && Number(m[2]) <= 59) {
-    return { cadence: 'semimonthly', deadline: formatTime(m[1], m[2]) }
-  }
-
-  m = s.match(/^bulanan\s+(\d{1,2})\s+(\d{1,2}):(\d{2})$/)
-  if (m && Number(m[1]) >= 1 && Number(m[1]) <= 31 && Number(m[2]) <= 23 && Number(m[3]) <= 59) {
-    return { cadence: 'monthly', deadline: `${Number(m[1])} ${formatTime(m[2], m[3])}` }
-  }
-
-  return null
-}
-
-function parseMonthlyDeadline(str) {
-  const m = String(str).trim().match(/^(\d{1,2})\s+(\d{1,2}):(\d{2})$/)
-  if (!m) return null
-  const day = Number(m[1])
-  const hour = Number(m[2])
-  const minute = Number(m[3])
-  if (day < 1 || day > 31 || hour > 23 || minute > 59) return null
-  return { day, hour, minute }
+/** Deskripsi jadwal untuk ditampilkan, mis. "2x sebulan · tenggat 11:30 WITA". */
+export function describeSchedule(schedule) {
+  const label = CADENCE_LABEL[schedule.cadence] || schedule.cadence
+  const extra = schedule.cadence === 'semimonthly' ? ' (cycle 1-4 & 15-18)' : ''
+  return `${label}${extra} · tenggat ${formatDeadline(schedule.deadline)} WITA`
 }
 
 /** Jadwal grup: setting per grup, atau default (config.deadline). */
@@ -193,7 +134,7 @@ export function groupSchedule(gid) {
   if (s && CADENCE_LABEL[s.cadence] && s.deadline) {
     return { cadence: s.cadence, deadline: s.deadline }
   }
-  const d = resolvedDeadline()
+  const d = config.deadline
   const p = parseDeadline(d)
   return { cadence: p && p.day === null ? 'daily' : 'weekly', deadline: d }
 }
@@ -204,20 +145,6 @@ export function setGroupSchedule(gid, schedule) {
   if (!schedule) delete all[gid]
   else all[gid] = { cadence: schedule.cadence, deadline: schedule.deadline }
   db.set('settings', 'groups', all)
-}
-
-/** Deskripsi jadwal untuk ditampilkan, mis. "2x sebulan · tenggat 11:30 WITA". */
-export function describeSchedule(schedule) {
-  const label = CADENCE_LABEL[schedule.cadence] || schedule.cadence
-  const extra = schedule.cadence === 'semimonthly' ? ' (cycle 1-4 & 15-18)' : ''
-  let deadlineText = schedule.deadline
-  if (schedule.cadence === 'monthly') {
-    const p = parseMonthlyDeadline(schedule.deadline)
-    if (p) deadlineText = `${Math.min(p.day, 31)} ${formatTime(p.hour, p.minute)}`
-  } else {
-    deadlineText = formatDeadline(schedule.deadline)
-  }
-  return `${label}${extra} · tenggat ${deadlineText} WITA`
 }
 
 /**
@@ -248,21 +175,7 @@ export function scheduleState(now, schedule) {
     const pid = periodId(now)
     return mkState({
       cadence: 'weekly', periodId: pid, periodStart: ws, periodEnd: ws + WEEK,
-      instant, deadlineText: formatDeadline(schedule.deadline), periodLabel: formatRange(pid),
-    })
-  }
-
-  if (cad === 'biweekly') {
-    const p = parseDeadline(schedule.deadline)
-    if (!p || p.day === null) return null
-    const ws = weekStartInstant(now)
-    const idx = Math.round((ws - FORTNIGHT_EPOCH) / WEEK)
-    const fs = FORTNIGHT_EPOCH + WEEK * (2 * Math.floor(idx / 2))
-    const ff = localFields(new Date(fs))
-    const instant = realInstantOf(ff.year, ff.month, ff.day + p.day, p.hour, p.minute)
-    return mkState({
-      cadence: 'biweekly', periodId: dayKey(new Date(fs)), periodStart: fs, periodEnd: fs + 2 * WEEK,
-      instant, deadlineText: formatDeadline(schedule.deadline), periodLabel: rangeLabel(fs, fs + 2 * WEEK),
+      instant, deadlineText: formatDeadline(schedule.deadline), periodLabel: rangeLabel(ws, ws + WEEK),
     })
   }
 
@@ -284,24 +197,6 @@ export function scheduleState(now, schedule) {
       periodStart: start, periodEnd: end, instant,
       deadlineText: formatDeadline(schedule.deadline), periodLabel: rangeLabel(start, end),
       days, hasDailySummary: true, hasFinalSummary: true, reminderAtInstant: true,
-    })
-  }
-
-  if (cad === 'monthly') {
-    const p = parseMonthlyDeadline(schedule.deadline)
-    if (!p) return null
-    const dim = daysInMonth(f.year, f.month)
-    const dayX = Math.min(p.day, dim)
-    const d = f.day
-    if (d < 1 || d > dayX + 1) return null
-    const start = realInstantOf(f.year, f.month, 1, 0, 0)
-    const end = realInstantOf(f.year, f.month, Math.min(dayX + 2, dim + 1), 0, 0)
-    const instant = realInstantOf(f.year, f.month, dayX, p.hour, p.minute)
-    return mkState({
-      cadence: 'monthly', periodId: `${f.year}-${String(f.month).padStart(2, '0')}`,
-      periodStart: start, periodEnd: end, instant,
-      deadlineText: `${dayX} ${formatTime(p.hour, p.minute)}`, periodLabel: rangeLabel(start, end),
-      hasFinalSummary: true, reminderAtInstant: false,
     })
   }
 
@@ -338,7 +233,7 @@ export function nextPeriodInfo(now, schedule) {
     let startDay, deadlineDay
     if (d < 15) { startDay = 15; deadlineDay = 17 }
     else {
-      if (m === 12) { y += 1; m = 1 } else m += 1
+      if (m === 12) { y = Number(f.year) + 1; m = 1 } else m += 1
       startDay = 1; deadlineDay = 3
     }
     const start = realInstantOf(y, m, startDay, 0, 0)
@@ -351,29 +246,6 @@ export function nextPeriodInfo(now, schedule) {
     }
   }
 
-  if (cad === 'monthly') {
-    const p = parseMonthlyDeadline(schedule.deadline)
-    if (!p) return null
-    const dim = daysInMonth(f.year, f.month)
-    const dayX = Math.min(p.day, dim)
-    const d = f.day
-    if (d >= 1 && d <= dayX + 1) return null
-    let y = f.year
-    let m = f.month
-    if (m === 12) { y += 1; m = 1 } else m += 1
-    const dim2 = daysInMonth(y, m)
-    const dayX2 = Math.min(p.day, dim2)
-    const start = realInstantOf(y, m, 1, 0, 0)
-    const end = realInstantOf(y, m, Math.min(dayX2 + 2, dim2 + 1), 0, 0)
-    const instant = realInstantOf(y, m, dayX2, p.hour, p.minute)
-    return {
-      periodId: `${y}-${String(m).padStart(2, '0')}`,
-      periodLabel: rangeLabel(start, end),
-      deadlineText: `${dayX2} ${formatTime(p.hour, p.minute)}`,
-      start, instant, end,
-    }
-  }
-
   return null
 }
 
@@ -381,15 +253,4 @@ export function nextPeriodInfo(now, schedule) {
 export function isAfterDeadline(date, schedule) {
   const st = scheduleState(date, schedule)
   return st ? date.getTime() >= st.instant : false
-}
-
-/** Rentang tanggal periode mingguan untuk ditampilkan, mis. "10 - 16 Agustus 2026". */
-export function formatRange(pid = periodId()) {
-  const [y, m, d] = pid.split('-').map(Number)
-  const start = new Date(Date.UTC(y, m - 1, d))
-  const end = new Date(Date.UTC(y, m - 1, d + 6))
-  const fmt = new Intl.DateTimeFormat('id-ID', {
-    timeZone: 'UTC', day: 'numeric', month: 'long', year: 'numeric',
-  })
-  return `${fmt.format(start)} - ${fmt.format(end)}`
 }

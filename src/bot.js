@@ -68,6 +68,17 @@ export function captureName(dbStore, jid, pushName) {
   return false
 }
 
+/** Baris list laporan untuk recap & !check. */
+export function reportListLines(done, due, dbStore, doneLabel = 'Sudah lapor') {
+  return [
+    `${doneLabel} (${done.length}):`,
+    done.length ? done.map((r) => `✅ ${r.name}`).join('\n') : '  -',
+    '',
+    `Belum lapor (${due.length}):`,
+    due.length ? due.map((p) => `❌ ${dbStore.get('names', p.id, '') || p.id.split('@')[0]}`).join('\n') : '  -',
+  ]
+}
+
 export function registerGroup(gid) {
   const groups = db.get('meta', 'groups', [])
   if (!groups.includes(gid)) {

@@ -46,6 +46,7 @@ export default [
       const { db, time } = ctx
       if (!m.isGroup) {
         const groups = db.get('meta', 'groups', [])
+        // !lapor boleh semua orang di grup, tapi dari DM hanya pengendali (admin).
         if (!(await isController(sock, groups, m.sender))) {
           return reply(sock, m, 'Perintah ini hanya bisa digunakan di dalam grup, atau oleh admin grup via DM.')
         }
@@ -73,7 +74,7 @@ export default [
         }
         const out = [
           `Laporan diterima di ${results.length} grup:`,
-          ...results.map(({ label, res }) => `- ${label}${res.late ? ' [TERLAMBAT]' : ''}`),
+          ...results.map(({ label }) => `- ${label}`),
         ].join('\n')
         return reply(sock, m, out)
       }
@@ -105,9 +106,6 @@ export default [
       let out = `Laporan diterima, terima kasih ${res.name}!`
       if (nameMismatch) {
         out += `\n\n(Catatan: nama tidak sama dengan nama WhatsApp kamu "${res.pushName}". Laporan tetap dicatat.)`
-      }
-      if (res.late) {
-        out += `\n\n[TERLAMBAT] Laporan dikirim setelah tenggat (${res.state.deadlineText} WITA).`
       }
       return reply(sock, m, out)
     },

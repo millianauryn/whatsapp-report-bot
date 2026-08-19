@@ -4,9 +4,8 @@ import { config } from './src/config.js'
 import * as db from './src/db.js'
 import * as time from './src/time.js'
 import * as bot from './src/bot.js'
-import { loadCommands, loadJobs } from './src/registry.js'
+import { commands, jobs } from './src/registry.js'
 import { startScheduler } from './src/scheduler.js'
-import { initLogger } from './src/logger.js'
 import { checkPermissionSafe } from './src/permissions.js'
 import { migrateData } from './src/migrate.js'
 
@@ -58,12 +57,8 @@ function normalizePhone(phone) {
 
 async function main() {
   acquireLock()
-  initLogger()
 
   db.load()
-
-  const commands = await loadCommands()
-  const jobs = await loadJobs()
 
   console.log('[bot] Bot Laporan WhatsApp dimulai...')
   console.log(`[bot] Zona waktu: ${config.timezone} | Jadwal default: ${config.deadline}`)
@@ -83,11 +78,11 @@ async function main() {
       qrcode.generate(qr, { small: true })
       console.log('\n[bot] Atau gunakan: node index.js --pair <nomor> untuk kode pairing\n')
     },
-    onOpen(sock) {
+    onOpen: async (sock) => {
       console.log(`[bot] Login sebagai: ${bot.botJidOf(sock)}`)
-      // Hanya grup dari link yang diizinkan yang di-join & dilayani.
-      void bot.joinAllowedGroups(sock)
-      void migrateData(sock).catch((err) => console.error('[migrate] Gagal migrasi data:', err?.message))
+      // Hanya grup dari link yang diizinkan yang di-join & dilayani; lalu preset jadwal.
+      await bot.joinAllowedGroups(sock)
+      migrateData()
     },
     onMessage(sock, m) {
       if (!m.message) return

@@ -10,8 +10,6 @@ export default [
         '*Bantuan Bot Laporan*',
         '',
         'Jadwal laporan grup ini: 2x sebulan, otomatis.',
-        '  Cycle 1-4 & 15-18 tiap bulan, tenggat tgl 3/17 jam 11:30.',
-        '  Summary 17:00 tiap hari, summary terakhir 23:58, reset 24:00.',
         '',
         '!lapor <nama>',
         '  Kirim laporanmu (cukup nama)',

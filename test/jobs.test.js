@@ -1,13 +1,12 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { makeSock, findSent, textsTo, G1, G2, MEMBER_A, MEMBER_B, cleanup } from './helpers.js'
-import { loadJobs } from '../src/registry.js'
+import { jobs } from '../src/registry.js'
 import * as db from '../src/db.js'
 import * as time from '../src/time.js'
 import { config } from '../src/config.js'
 
 db.load()
-const jobs = await loadJobs()
 const job = (name) => jobs.find((j) => j.name === name)
 
 function ctx(sock) {
@@ -158,6 +157,7 @@ test('deadlineAlert: 2xsebulan -> summary harian 17:00 = check per hari, sekali 
   assert.ok(summary.content.text.includes('Sudah lapor hari ini (0)'), 'hanya laporan HARI ITU')
   assert.ok(!summary.content.text.includes('✅ A'), 'lapor tgl 15 tidak muncul di summary tgl 17')
   assert.ok(summary.content.text.includes('❌'), 'list belum lapor ada')
+  assert.equal(summary.content.mentions, undefined, 'summary tanpa mention')
   assert.equal(textsTo(sock, MEMBER_B).length, 0, 'summary bukan DM')
   assert.equal(db.get('flags', '2026-08-15')[`${G1}:summary:2026-08-17`], true)
 
@@ -309,6 +309,7 @@ test('2xsebulan: siklus penuh September 2026 - cycle A & B, gap diam total', asy
   assert.ok(m.content.text.includes('Sudah lapor hari ini (1)'), 'A lapor hari itu muncul')
   assert.ok(m.content.text.includes('✅ A'))
   assert.ok(m.content.text.includes('Belum lapor (1)'), 'MEMBER_B belum')
+  assert.equal(m.content.mentions, undefined, 'summary tanpa mention')
 
   // tgl 3 11:30:30 WITA -> reminder PERSIS jam tenggat, 1x, hanya yang belum
   const sRem = makeSock()

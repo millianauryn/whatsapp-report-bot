@@ -1,17 +1,16 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { makeSock, makeMsg, findSent, textsTo, G1, G2, ADMIN, MEMBER_A, MEMBER_B, OUTSIDER, cleanup } from './helpers.js'
-import { loadCommands } from '../src/registry.js'
+import { makeSock, makeMsg, findSent, G1, G2, ADMIN, MEMBER_A, MEMBER_B, OUTSIDER, cleanup } from './helpers.js'
+import { commands } from '../src/registry.js'
 import * as db from '../src/db.js'
 import * as time from '../src/time.js'
 import * as bot from '../src/bot.js'
+import { checkPermissionSafe } from '../src/permissions.js'
 
 db.load()
 // Semua grup uji pakai jadwal mingguan Jumat 21:00 -> periode = minggu berjalan.
 time.setGroupSchedule(G1, { cadence: 'weekly', deadline: 'Jumat 21:00' })
 time.setGroupSchedule(G2, { cadence: 'weekly', deadline: 'Jumat 21:00' })
-
-const commands = await loadCommands()
 
 function run(cmd, sock, msg) {
   return commands.get(cmd).run(sock, msg, { db, time, bot, commands, sock })
@@ -87,14 +86,10 @@ test('!lapor: nama tersimpan ke names walau dari DM', async () => {
 
 test('!lapor: ditolak saat periode belum dibuka (gap)', async () => {
   const sock = makeSock()
-  time.setGroupSchedule(G1, { cadence: 'monthly', deadline: '5 11:30' })
+  time.setGroupSchedule(G1, { cadence: 'semimonthly', deadline: '11:30' })
   try {
-    const now = new Date()
-    const f = time.localFields(now)
-    const inWindow = f.day >= 1 && f.day <= 6
     await run('lapor', sock, makeMsg({ args: 'Orang - di sela' }))
-    const reply = findSent(sock, G1, inWindow ? 'Laporan diterima' : 'belum dibuka')
-    assert.ok(reply, inWindow ? 'diterima (masih window)' : 'ditolak (gap)')
+    assert.ok(findSent(sock, G1, 'belum dibuka'), 'ditolak (gap)')
   } finally {
     time.setGroupSchedule(G1, { cadence: 'weekly', deadline: 'Jumat 21:00' })
   }
@@ -110,6 +105,7 @@ test('!check: HANYA list, tidak mengirim DM apa pun', async () => {
   const recap = findSent(sock, G1, 'Cek Laporan')
   assert.ok(recap, 'recap list tampil')
   assert.ok(recap.content.text.includes('❌ Dewi'))
+  assert.equal(recap.content.mentions, undefined, 'list tanpa mention')
   const dms = sock.sent.filter((s) => s.jid === MEMBER_A || s.jid === MEMBER_B)
   assert.equal(dms.length, 0, 'tidak ada DM ke peserta mana pun')
 })
@@ -129,11 +125,11 @@ test('!check: semua sudah lapor -> list tetap tampil', async () => {
   assert.ok(recap.content.text.includes('Belum lapor (0)'))
 })
 
-test('!check dari DM orang luar: ditolak', async () => {
+test('!check dari DM orang luar: izin ditolak', async () => {
   const sock = makeSock()
   db.set('meta', 'groups', [G1])
-  await run('check', sock, makeMsg({ isGroup: false, sender: OUTSIDER, jid: 'dm' }))
-  assert.ok(findSent(sock, 'dm', 'hanya bisa digunakan di dalam grup'))
+  const ok = await checkPermissionSafe(commands.get('check'), makeMsg({ isGroup: false, sender: OUTSIDER, jid: 'dm' }), sock)
+  assert.equal(ok, false, 'orang luar tidak lolos izin')
 })
 
 // ================= !bantuan =================

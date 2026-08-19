@@ -11,7 +11,7 @@ Dibangun dengan [Baileys](https://github.com/WhiskeysSockets/Baileys) (protocol 
 - `!check` (admin) untuk melihat list siapa sudah/belum lapor — tanpa DM; nama per nomor diambil dari laporan terakhir (`!lapor`), nama WhatsApp hanya sebagai isi awal bila belum pernah lapor
 - **Otomatis:** DM pengingat menjelang tenggat (default 60 menit sebelum; untuk jadwal 2xsebulan: persis jam tenggat)
 - **Otomatis real-time:** DM + ringkasan grup tepat saat tenggat lewat
-- Laporan setelah tenggat tetap diterima, ditandai **terlambat**
+- Laporan setelah tenggat tetap diterima (tanpa penanda terlambat)
 - Periode baru otomatis per jadwal grup (tanpa perintah manual)
 - Arsitektur modular — fitur baru tinggal tambah 1 file
 
@@ -82,7 +82,7 @@ lapor diterima   │    lalu alert DM + recap         (17:00, tiap        terakh
 ```
 
 - Summary **17:00** dikirim tiap hari selama cycle (4x per cycle)
-- Lapor setelah tenggat (11:30) sampai akhir periode tetap diterima, ditandai **terlambat**
+- Lapor setelah tenggat (11:30) sampai akhir periode tetap diterima (tanpa penanda terlambat)
 - Di tanggal sela (5–14 dan 19–31) `!lapor` ditolak dengan info jadwal berikutnya
 
 ## Cara Bot Masuk Grup (hanya link yang diizinkan)

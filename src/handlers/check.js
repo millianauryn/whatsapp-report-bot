@@ -1,12 +1,4 @@
-import { reply, groupMeta, botJidOf, nonReporters, sendMention, isController, memberParticipants } from '../bot.js'
-
-function displayName(db, jid, fallback = '') {
-  return db.get('names', jid, '') || fallback
-}
-
-function jidToNumber(jid) {
-  return jid.split('@')[0]
-}
+import { reply, groupMeta, botJidOf, nonReporters, sendText, memberParticipants, reportListLines } from '../bot.js'
 
 export default [
   {
@@ -14,13 +6,6 @@ export default [
     aliases: ['ingatkan', 'pengingat'],
     permission: 'admin',
     async run(sock, m, { db, time }) {
-      if (!m.isGroup) {
-        const groups = db.get('meta', 'groups', [])
-        if (!(await isController(sock, groups, m.sender))) {
-          return reply(sock, m, 'Perintah ini hanya bisa digunakan di dalam grup, atau oleh admin grup via DM.')
-        }
-      }
-
       const now = new Date()
       const groupIds = m.isGroup ? [m.jid] : db.get('meta', 'groups', [])
       if (groupIds.length === 0) {
@@ -52,7 +37,7 @@ export default [
           lines.push(next
             ? `Periode belum dibuka. Jadwal berikutnya: ${next.periodLabel} (tenggat ${next.deadlineText} WITA).`
             : 'Periode belum dibuka. Cek jadwal dengan !tenggat.')
-          parts.push({ gid, lines, mentions: [] })
+          parts.push({ gid, lines })
           continue
         }
 
@@ -67,13 +52,9 @@ export default [
         lines.push(`Jadwal: ${time.describeSchedule(schedule)}`)
         lines.push(`Tenggat: ${state.deadlineText} WITA`)
         lines.push('')
-        lines.push(`Sudah lapor (${done.length}):`)
-        lines.push(done.length ? done.map((r) => `✅ ${r.name}`).join('\n') : '  -')
-        lines.push('')
-        lines.push(`Belum lapor (${due.length}):`)
-        lines.push(due.length ? due.map((p) => `❌ ${displayName(db, p.id, jidToNumber(p.id))}`).join('\n') : '  -')
+        lines.push(...reportListLines(done, due, db))
 
-        parts.push({ gid, lines, mentions: due.map((p) => p.id) })
+        parts.push({ gid, lines })
       }
 
       if (parts.length === 0) {
@@ -81,7 +62,8 @@ export default [
       }
 
       for (const r of parts) {
-        await sendMention(sock, r.gid, r.lines.join('\n'), r.mentions, m.jid === r.gid ? m : undefined)
+        // List saja, tanpa mention dan tanpa DM.
+        await sendText(sock, r.gid, r.lines.join('\n'), m.jid === r.gid ? m : undefined)
       }
     },
   },

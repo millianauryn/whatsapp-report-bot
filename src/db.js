@@ -1,12 +1,15 @@
 import { readFileSync, writeFileSync, renameSync } from 'node:fs'
 import { config } from './config.js'
 
-const file = process.env.BOT_DATA_FILE || config.data_file
 const data = { collections: {} }
+
+function dataFile() {
+  return process.env.BOT_DATA_FILE || config.data_file
+}
 
 export function load() {
   try {
-    const raw = JSON.parse(readFileSync(file, 'utf8'))
+    const raw = JSON.parse(readFileSync(dataFile(), 'utf8'))
     if (raw && raw.collections) Object.assign(data.collections, raw.collections)
   } catch {
     save()
@@ -14,9 +17,9 @@ export function load() {
 }
 
 export function save() {
-  const tmp = `${file}.tmp`
+  const tmp = `${dataFile()}.tmp`
   writeFileSync(tmp, JSON.stringify(data, null, 2))
-  renameSync(tmp, file)
+  renameSync(tmp, dataFile())
 }
 
 function col(name) {

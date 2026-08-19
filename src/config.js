@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { parseDeadline } from './time.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const raw = JSON.parse(readFileSync(path.join(__dirname, '..', 'config.json'), 'utf8'))
@@ -26,16 +27,9 @@ function timezone(val) {
   }
 }
 
-const DEADLINE_RE = /^(?:([A-Za-z]+)\s+)?(\d{1,2}):(\d{2})$/
-const DAYS = new Set([
-  'senin', 'selasa', 'rabu', 'kamis', 'jumat', 'sabtu', 'minggu',
-  'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday',
-])
-
-/** Format tenggat valid: "21:00" (setiap hari) atau "Jumat 21:00" (1x seminggu). */
+/** Format tenggat valid (sama parser dgn time.js): "21:00" atau "Jumat 21:00". */
 function deadline(val) {
-  const m = String(val).trim().match(DEADLINE_RE)
-  if (m && (!m[1] || DAYS.has(m[1].toLowerCase())) && Number(m[2]) <= 23 && Number(m[3]) <= 59) return val
+  if (parseDeadline(String(val).trim())) return val
   console.log(`[config] deadline: ${JSON.stringify(val)} -> 21:00 (otomatis diperbaiki)`)
   return '21:00'
 }
