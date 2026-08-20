@@ -53,8 +53,6 @@ function normalizePhone(phone) {
   return digits
 }
 
-/** Gabung grup: hanya saat bot ditambahkan langsung ke grup (lihat src/bot.js). */
-
 async function main() {
   acquireLock()
 
@@ -68,8 +66,6 @@ async function main() {
     config,
     db,
     time,
-    bot,
-    commands,
   }
 
   const botHandle = await bot.createBot({
@@ -90,6 +86,10 @@ async function main() {
       const jid = m.key.remoteJid
       const isGroup = jid.endsWith('@g.us')
       const sender = m.key.participant || jid
+
+      // Grup berkadence monthly hanya aktif 1 hari per bulan; di luar itu diam total.
+      if (isGroup && !time.isGroupActive(jid)) return
+
       const pushName = (m.pushName || '').trim()
 
       // Nama per nomor: nama dari !lapor selalu menang; nama WhatsApp hanya

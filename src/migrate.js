@@ -1,17 +1,22 @@
 import * as db from './db.js'
 
 /**
- * Preset jadwal 2xsebulan 11:30 untuk grup terdaftar — dijalankan SEKALI
- * (penanda meta.preset_done; dipanggil setiap koneksi terbuka).
+ * Preset jadwal 2xsebulan 11:30 untuk grup terdaftar yang belum punya jadwal.
+ * Idempoten: setiap koneksi terbuka, grup baru tanpa jadwal ikut dipreset.
  */
 export function migrateData() {
   const groups = db.get('meta', 'groups', [])
-  if (groups.length === 0 || db.get('meta', 'preset_done', false)) return
+  if (groups.length === 0) return
   const all = db.get('settings', 'groups', {})
-  if (Object.keys(all).length === 0) {
-    for (const gid of groups) all[gid] = { cadence: 'semimonthly', deadline: '11:30' }
-    db.set('settings', 'groups', all)
-    console.log(`[migrate] preset jadwal 2xsebulan 11:30 untuk ${groups.length} grup terdaftar`)
+  let added = 0
+  for (const gid of groups) {
+    if (!all[gid]) {
+      all[gid] = { cadence: 'semimonthly', deadline: '11:30' }
+      added++
+    }
   }
-  db.set('meta', 'preset_done', true)
+  if (added > 0) {
+    db.set('settings', 'groups', all)
+    console.log(`[migrate] preset jadwal 2xsebulan 11:30 untuk ${added} grup`)
+  }
 }

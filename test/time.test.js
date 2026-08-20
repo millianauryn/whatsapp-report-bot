@@ -6,11 +6,11 @@ import * as time from '../src/time.js'
 
 test('parseDeadline: format valid', () => {
   const p = time.parseDeadline('Jumat 21:00')
-  assert.deepEqual(p, { day: 4, hour: 21, minute: 0 })
-  assert.deepEqual(time.parseDeadline('sabtu 12:30'), { day: 5, hour: 12, minute: 30 })
-  assert.deepEqual(time.parseDeadline('monday 08:15'), { day: 0, hour: 8, minute: 15 })
-  assert.deepEqual(time.parseDeadline('21:00'), { day: null, hour: 21, minute: 0 }, 'tanpa hari = setiap hari')
-  assert.deepEqual(time.parseDeadline('8:05'), { day: null, hour: 8, minute: 5 })
+  assert.deepEqual(p, { day: 4, dayType: 'weekday', hour: 21, minute: 0 })
+  assert.deepEqual(time.parseDeadline('sabtu 12:30'), { day: 5, dayType: 'weekday', hour: 12, minute: 30 })
+  assert.deepEqual(time.parseDeadline('monday 08:15'), { day: 0, dayType: 'weekday', hour: 8, minute: 15 })
+  assert.deepEqual(time.parseDeadline('21:00'), { day: null, dayType: null, hour: 21, minute: 0 }, 'tanpa hari = setiap hari')
+  assert.deepEqual(time.parseDeadline('8:05'), { day: null, dayType: null, hour: 8, minute: 5 })
 })
 
 test('parseDeadline: format invalid -> null', () => {
@@ -49,6 +49,50 @@ test('formatDeadline: rapi dari berbagai format', () => {
   assert.equal(time.formatDeadline('21:00'), '21:00')
   assert.equal(time.formatDeadline('8:05'), '08:05')
   assert.equal(time.formatDeadline('tidak valid'), 'tidak valid', 'invalid dikembalikan apa adanya')
+})
+
+test('parseDeadline: format 1x sebulan "5 11:30" (tanggal + jam)', () => {
+  assert.deepEqual(time.parseDeadline('5 11:30'), { day: 5, dayType: 'dom', hour: 11, minute: 30 })
+  assert.deepEqual(time.parseDeadline('28 8:05'), { day: 28, dayType: 'dom', hour: 8, minute: 5 })
+  assert.equal(time.parseDeadline('0 11:30'), null, 'tgl 0 tidak valid')
+  assert.equal(time.parseDeadline('32 11:30'), null, 'tgl 32 tidak valid')
+  assert.equal(time.parseDeadline('5 25:00'), null, 'jam 25 tidak valid')
+  assert.equal(time.parseDeadline('5 11:99'), null, 'menit 99 tidak valid')
+  assert.equal(time.formatDeadline('5 11:30'), 'tgl 5 11:30')
+})
+
+test('scheduleState: 1x sebulan -> aktif HANYA di tanggal tenggat, sisa bulan null', () => {
+  const s = { cadence: 'monthly', deadline: '5 11:30' }
+  const st = time.scheduleState(new Date('2026-08-05T02:00:00.000Z'), s)
+  assert.equal(st.periodId, '2026-08')
+  assert.equal(st.instant, time.realInstantOf(2026, 8, 5, 11, 30, 0))
+  assert.equal(st.periodLabel, '5 Agustus 2026')
+  assert.equal(st.deadlineText, 'tgl 5 11:30')
+  assert.equal(st.reminderAtInstant, true, 'reminder pas jam tenggat')
+  assert.equal(st.hasDailySummary, false, 'tanpa summary harian')
+  assert.equal(st.hasFinalSummary, false, 'tanpa summary terakhir')
+  assert.equal(time.scheduleState(new Date('2026-08-04T02:00:00.000Z'), s), null, 'sehari sebelum = null')
+  assert.equal(time.scheduleState(new Date('2026-08-06T02:00:00.000Z'), s), null, 'sehari setelah = null')
+  assert.equal(time.scheduleState(new Date('2026-08-20T02:00:00.000Z'), s), null, 'tengah bulan = null')
+})
+
+test('nextPeriodInfo: 1x sebulan -> bulan berjalan (sebelum tgl) / bulan depan (sesudah)', () => {
+  const s = { cadence: 'monthly', deadline: '5 11:30' }
+  assert.equal(time.scheduleState(new Date('2026-08-05T00:00:00.000Z'), s).periodId, '2026-08', 'hari aktif')
+  const before = time.nextPeriodInfo(new Date('2026-08-02T00:00:00.000Z'), s)
+  assert.equal(before.periodId, '2026-08')
+  assert.equal(before.periodLabel, '5 Agustus 2026')
+  const after = time.nextPeriodInfo(new Date('2026-08-20T00:00:00.000Z'), s)
+  assert.equal(after.periodId, '2026-09')
+  assert.equal(after.periodLabel, '5 September 2026')
+  const roll = time.nextPeriodInfo(new Date('2026-12-20T00:00:00.000Z'), s)
+  assert.equal(roll.periodId, '2027-01', 'rollover tahun')
+  assert.equal(roll.periodLabel, '5 Januari 2027')
+  assert.equal(time.nextPeriodInfo(new Date('2026-08-05T00:00:00.000Z'), s), null, 'hari aktif = null')
+})
+
+test('describeSchedule: label 1x sebulan', () => {
+  assert.equal(time.describeSchedule({ cadence: 'monthly', deadline: '5 11:30' }), '1x sebulan · tenggat tgl 5 11:30 WITA')
 })
 
 // ================= jadwal per grup =================
@@ -136,11 +180,4 @@ test('nextPeriodInfo: info periode berikutnya saat gap', () => {
   assert.equal(next2.periodLabel, '1 - 4 September 2026')
   // saat periode berjalan -> null
   assert.equal(time.nextPeriodInfo(new Date('2026-08-03T00:00:00.000Z'), s), null)
-})
-
-test('isAfterDeadline: per jadwal grup', () => {
-  const s = { cadence: 'semimonthly', deadline: '11:30' }
-  assert.equal(time.isAfterDeadline(new Date('2026-08-03T02:00:00.000Z'), s), false, 'sebelum 11:30 WITA')
-  assert.equal(time.isAfterDeadline(new Date('2026-08-03T05:00:00.000Z'), s), true, 'setelah 11:30 WITA')
-  assert.equal(time.isAfterDeadline(new Date('2026-08-10T00:00:00.000Z'), s), false, 'gap = bukan terlambat')
 })

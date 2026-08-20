@@ -213,17 +213,9 @@ export async function createBot(handlers) {
       }
     })
 
+    // Bot dikeluarkan dari grup -> berhenti melayani (join hanya lewat link, lihat joinAllowedGroups).
     sock.ev.on('group-participants.update', (u) => {
-      if (!u.participants.includes(botJidOf(sock))) return
-      if (u.action === 'add') {
-        // Hanya grup dari link yang diizinkan yang dilayani; ditambahkan langsung -> diabaikan.
-        if (!shouldServeGroup(u.id)) {
-          console.log(`[bot] Grup tidak diizinkan, diabaikan: ${u.id}`)
-          return
-        }
-        registerGroup(u.id)
-      }
-      if (u.action === 'remove') unregisterGroup(u.id)
+      if (u.participants.includes(botJidOf(sock)) && u.action === 'remove') unregisterGroup(u.id)
     })
   }
 

@@ -57,9 +57,6 @@ export function makeSock() {
       sent.push({ jid: 'system', content: { invite: code }, options: undefined })
       return G1
     },
-    async groupLeave(jid) {
-      sent.push({ jid, content: { left: true }, options: undefined })
-    },
   }
 }
 

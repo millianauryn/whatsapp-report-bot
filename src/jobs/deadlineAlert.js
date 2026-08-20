@@ -1,9 +1,9 @@
 import { groupMeta, botJidOf, nonReporters, sendText, sendMention, memberParticipants, reportListLines } from '../bot.js'
 
-function recapLines(state, done, due, db, header, doneLabel = 'Sudah lapor') {
+function recapLines(state, done, due, db, header, cadenceLabel, doneLabel = 'Sudah lapor') {
   return [
     header,
-    `Jadwal: ${state.cadenceLabel}`,
+    `Jadwal: ${cadenceLabel}`,
     `Tenggat: ${state.deadlineText} WITA`,
     '',
     ...reportListLines(done, due, db, doneLabel),
@@ -95,7 +95,7 @@ export default {
             console.error(`[deadlineAlert] Gagal DM ${p.id}:`, err?.message)
           }
         }
-        const lines = recapLines(state, done, due, db, `*Tenggat Laporan Lewat - ${state.periodLabel}*`)
+        const lines = recapLines(state, done, due, db, `*Tenggat Laporan Lewat - ${state.periodLabel}*`, cadenceLabel)
         lines.push('', 'DM pengingat sudah dikirim ke yang belum lapor.')
         try {
           await sendMention(sockObj, gid, lines.join('\n'), due.map((p) => p.id))
@@ -113,7 +113,7 @@ export default {
       const doneList = isDaily
         ? done.filter((r) => r.time && time.dayKey(new Date(r.time)) === day)
         : done
-      const lines = recapLines(state, doneList, due, db, header, isDaily ? 'Sudah lapor hari ini' : undefined)
+      const lines = recapLines(state, doneList, due, db, header, cadenceLabel, isDaily ? 'Sudah lapor hari ini' : undefined)
       if (event.type === 'final') {
         lines.push('', 'Periode berakhir malam ini (24:00 WITA).')
         // Cari jadwal berikutnya dari akhir periode (karena saat ini masih di hari terakhir)

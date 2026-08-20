@@ -21,7 +21,7 @@ export default [
         '!bantuan',
         '  Tampilkan bantuan ini',
         '',
-        '*Otomatis:* kamu akan menerima DM pengingat sebelum tenggat,',
+        '*Otomatis:* kamu akan menerima DM pengingat pas jam tenggat,',
         'dan DM pemberitahuan setelah tenggat lewat bila belum lapor.',
         '',
         '*Admin:* !lapor dan !check juga bisa dikirim dari DM (private chat) ke bot.',

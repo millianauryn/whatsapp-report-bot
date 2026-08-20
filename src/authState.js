@@ -32,6 +32,8 @@ function decrypt(b64, key) {
 
 /** Kunci 32 byte: buat otomatis bila belum ada (mode 600), di dalam folder auth. */
 function ensureKey(authDir) {
+  mkdirSync(authDir, { recursive: true, mode: 0o700 })
+  chmodSync(authDir, 0o700)
   const keyFile = path.join(authDir, KEY_FILE)
   if (existsSync(keyFile)) return readFileSync(keyFile)
   const key = crypto.randomBytes(32)

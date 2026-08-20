@@ -9,7 +9,7 @@ export default [
       const now = new Date()
       const groupIds = m.isGroup ? [m.jid] : db.get('meta', 'groups', [])
       if (groupIds.length === 0) {
-        return reply(sock, m, 'Belum ada grup yang terdaftar. Tambahkan bot ke grup atau gunakan !join <link>.')
+        return reply(sock, m, 'Belum ada grup yang terdaftar. Tambahkan bot ke grup lewat link undangan yang diizinkan (config.allowed_group_links).')
       }
 
       const myJid = botJidOf(sock)
@@ -36,7 +36,7 @@ export default [
           lines.push(`*Cek Laporan - ${time.describeSchedule(schedule)}*`)
           lines.push(next
             ? `Periode belum dibuka. Jadwal berikutnya: ${next.periodLabel} (tenggat ${next.deadlineText} WITA).`
-            : 'Periode belum dibuka. Cek jadwal dengan !tenggat.')
+            : 'Periode belum dibuka. Cek jadwal dengan !check.')
           parts.push({ gid, lines })
           continue
         }

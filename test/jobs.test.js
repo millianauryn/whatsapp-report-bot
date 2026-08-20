@@ -110,6 +110,7 @@ test('deadlineAlert: mingguan -> DM + recap grup, HANYA sekali', async () => {
   const recap = findSent(sock, G1, 'Tenggat Laporan Lewat')
   assert.ok(recap, 'recap grup terkirim')
   assert.ok(recap.content.text.includes('✅') && recap.content.text.includes('❌'))
+  assert.ok(recap.content.text.includes('Jadwal: mingguan · tenggat Jumat 21:00'), 'jadwal tampil, bukan undefined')
   assert.equal(db.get('flags', '2026-08-17')[`${G1}:alert`], true)
 
   await job('deadlineAlert').run(after, ctx(makeSock()))
@@ -175,6 +176,47 @@ test('deadlineAlert: 2xsebulan -> summary harian 17:00 = check per hari, sekali 
   assert.ok(summary2, 'summary hari berikutnya terkirim')
   assert.ok(summary2.content.text.includes('Sudah lapor hari ini (1)'))
   assert.ok(summary2.content.text.includes('✅ A'), 'lapor hari itu muncul')
+})
+
+test('deadlineAlert: hari tenggat -> alert 11:31 DAN summary 17:00 sama-sama terkirim', async () => {
+  const sock = makeSock()
+  db.clear('flags')
+  setSchedule(G1, { cadence: 'semimonthly', deadline: '11:30' })
+  db.set('meta', 'groups', [G1])
+  db.set('reports', '2026-08-01', { [G1]: {} })
+  db.set('settings', 'alertEnabled', true)
+
+  // 11:31:30 WITA tgl 3: alert jalan
+  await job('deadlineAlert').run(new Date('2026-08-03T03:31:30.000Z'), ctx(sock))
+  assert.ok(findSent(sock, G1, 'Tenggat Laporan Lewat'), 'alert terkirim di hari tenggat')
+  assert.equal(db.get('flags', '2026-08-01')[`${G1}:alert`], true)
+
+  // 17:00:30 WITA tgl 3: summary tetap jalan walau alert sudah terjadi hari itu
+  const s2 = makeSock()
+  await job('deadlineAlert').run(new Date('2026-08-03T09:00:30.000Z'), ctx(s2))
+  assert.ok(findSent(s2, G1, 'Summary Harian'), 'summary tetap terkirim setelah alert di hari yang sama')
+  assert.equal(db.get('flags', '2026-08-01')[`${G1}:summary:2026-08-03`], true)
+})
+
+test('deadlineAlert: hari terakhir -> summary 17:00 DAN summary terakhir 23:58 sama-sama terkirim', async () => {
+  const sock = makeSock()
+  db.clear('flags')
+  setSchedule(G1, { cadence: 'semimonthly', deadline: '11:30' })
+  db.set('meta', 'groups', [G1])
+  db.set('reports', '2026-08-01', { [G1]: {} })
+  db.set('settings', 'alertEnabled', true)
+
+  // 17:00:30 WITA tgl 4: summary harian
+  await job('deadlineAlert').run(new Date('2026-08-04T09:00:30.000Z'), ctx(sock))
+  assert.ok(findSent(sock, G1, 'Summary Harian'), 'summary harian tgl 4 terkirim')
+
+  // 23:58:30 WITA tgl 4: summary terakhir tetap jalan
+  const s2 = makeSock()
+  await job('deadlineAlert').run(new Date('2026-08-04T15:58:30.000Z'), ctx(s2))
+  assert.ok(findSent(s2, G1, 'Summary Terakhir'), 'summary terakhir terkirim di hari yang sama')
+  const flags = db.get('flags', '2026-08-01')
+  assert.equal(flags[`${G1}:summary:2026-08-04`], true)
+  assert.equal(flags[`${G1}:final`], true)
 })
 
 test('deadlineAlert: 2xsebulan -> summary terakhir 23:58 + info berikutnya', async () => {
@@ -390,4 +432,98 @@ test('2xsebulan: siklus penuh September 2026 - cycle A & B, gap diam total', asy
   await job('reminder').run(new Date('2026-09-25T04:00:00.000Z'), ctx(sGap2))
   await job('deadlineAlert').run(new Date('2026-09-25T09:00:30.000Z'), ctx(sGap2))
   assert.equal(sGap2.sent.length, 0, 'gap akhir bulan: tidak ada kiriman apa pun')
+})
+
+test('deadlineAlert 2xsebulan: komen recap lengkap + DM alert ke SEMUA yang belum lapor', async () => {
+  const sock = makeSock()
+  db.clear('flags')
+  setSchedule(G1, { cadence: 'semimonthly', deadline: '11:30' })
+  db.set('meta', 'groups', [G1])
+  db.set('reports', '2026-08-01', { [G1]: {} })
+  db.set('settings', 'alertEnabled', true)
+  db.set('names', MEMBER_A, 'Anggota A')
+
+  await job('deadlineAlert').run(new Date('2026-08-03T03:31:30.000Z'), ctx(sock))
+
+  const dmA = textsTo(sock, MEMBER_A)[0]
+  const dmB = textsTo(sock, MEMBER_B)[0]
+  assert.ok(dmA.includes('Halo Anggota A'), 'nama tersimpan disubstitusi ke {nama}')
+  assert.ok(dmA.includes('Tenggat Laporan Sudah Lewat - 1 - 4 Agustus 2026'), 'header DM berisi periode')
+  assert.ok(dmA.includes('tenggat (11:30 WITA)'), 'tenggat di DM')
+  assert.ok(dmA.includes('!lapor'), 'format lapor di DM')
+  assert.ok(dmB.includes('Halo,'), 'nama kosong -> {nama} dibersihkan')
+  assert.ok(!dmB.includes('undefined'), 'bukan undefined')
+
+  const recap = findSent(sock, G1, 'Tenggat Laporan Lewat')
+  assert.ok(recap, 'komen recap grup terkirim')
+  const text = recap.content.text
+  assert.ok(text.includes('Jadwal: 2x sebulan (cycle 1-4 & 15-18) · tenggat 11:30 WITA'), 'komen menampilkan jadwal')
+  assert.ok(text.includes('Tenggat: 11:30 WITA'), 'komen menampilkan tenggat')
+  assert.ok(text.includes('Sudah lapor (0):'), 'komen: belum ada yang lapor')
+  assert.ok(text.includes('Belum lapor (2):'), 'komen: dua orang belum lapor')
+  assert.ok(text.includes('DM pengingat sudah dikirim ke yang belum lapor.'), 'komen info DM terkirim')
+  assert.ok(recap.content.mentions.includes(MEMBER_A) && recap.content.mentions.includes(MEMBER_B), 'komen mention yang belum lapor')
+})
+
+test('reminder: DM pengingat CUMA tgl 3 & 17 pas 11:30, bukan hari lain', async () => {
+  db.clear('flags')
+  setSchedule(G1, { cadence: 'semimonthly', deadline: '11:30' })
+  db.set('meta', 'groups', [G1])
+  db.set('reports', '2026-08-01', { [G1]: {} })
+
+  const at = (d, h = 11, m = 30, s = 0) => new Date(time.realInstantOf(2026, 8, d, h, m, s))
+
+  const s3 = makeSock()
+  await job('reminder').run(at(3), ctx(s3))
+  assert.equal(s3.sent.length, 2, 'tgl 3 PAS 11:30:00: DM ke semua yang belum')
+
+  db.clear('flags')
+  const s17 = makeSock()
+  await job('reminder').run(at(17), ctx(s17))
+  assert.equal(s17.sent.length, 2, 'tgl 17 PAS 11:30:00: DM ke semua yang belum')
+
+  for (const d of [2, 4, 16, 18]) {
+    db.clear('flags')
+    const s = makeSock()
+    await job('reminder').run(at(d), ctx(s))
+    assert.equal(s.sent.length, 0, `tgl ${d} 11:30: tidak ada DM`)
+  }
+})
+
+test('1x sebulan: hari aktif tgl 5 -> reminder pas 11:30, alert 11:31 + recap, TANPA summary', async () => {
+  db.clear('flags')
+  setSchedule(G1, { cadence: 'monthly', deadline: '5 11:30' })
+  db.set('meta', 'groups', [G1])
+  db.set('reports', '2026-08', { [G1]: {} })
+  db.set('settings', 'alertEnabled', true)
+
+  // 11:30:30 WITA tgl 5: reminder pas tenggat
+  const s1 = makeSock()
+  await job('reminder').run(new Date('2026-08-05T03:30:30.000Z'), ctx(s1))
+  assert.equal(textsTo(s1, MEMBER_A).length, 1, 'reminder tgl 5 ke yang belum')
+  assert.equal(textsTo(s1, MEMBER_B).length, 1)
+  assert.equal(db.get('flags', '2026-08')[`${G1}:reminder`], true)
+
+  // 11:31:30: alert + recap
+  const s2 = makeSock()
+  await job('deadlineAlert').run(new Date('2026-08-05T03:31:30.000Z'), ctx(s2))
+  assert.equal(textsTo(s2, MEMBER_A).length, 1, 'alert DM tgl 5')
+  assert.ok(findSent(s2, G1, 'Tenggat Laporan Lewat'), 'recap grup terkirim')
+  assert.equal(db.get('flags', '2026-08')[`${G1}:alert`], true)
+
+  // 17:00: TANPA summary harian (1 hari saja)
+  const s3 = makeSock()
+  await job('deadlineAlert').run(new Date('2026-08-05T09:00:30.000Z'), ctx(s3))
+  assert.ok(!findSent(s3, G1, 'Summary Harian'), 'tanpa summary 17:00')
+
+  // 23:58: tanpa summary terakhir
+  const s4 = makeSock()
+  await job('deadlineAlert').run(new Date('2026-08-05T15:58:30.000Z'), ctx(s4))
+  assert.ok(!findSent(s4, G1, 'Summary Terakhir'), 'tanpa summary akhir')
+
+  // Sehari setelahnya (tgl 6): diam total, semua job tanpa kiriman
+  const s5 = makeSock()
+  await job('reminder').run(new Date('2026-08-06T03:30:30.000Z'), ctx(s5))
+  await job('deadlineAlert').run(new Date('2026-08-06T09:00:30.000Z'), ctx(s5))
+  assert.equal(s5.sent.length, 0, 'tgl 6: tidak ada kiriman apa pun')
 })

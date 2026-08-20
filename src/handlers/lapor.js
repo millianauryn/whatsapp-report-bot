@@ -70,7 +70,7 @@ export default [
         }
 
         if (results.length === 0) {
-          return reply(sock, m, 'Periode laporan sedang tidak dibuka di grup mana pun. Cek jadwal dengan !tenggat.')
+          return reply(sock, m, 'Periode laporan sedang tidak dibuka di grup mana pun. Cek jadwal dengan !check.')
         }
         const out = [
           `Laporan diterima di ${results.length} grup:`,
@@ -98,7 +98,7 @@ export default [
           sock, m,
           next
             ? `Periode laporan saat ini belum dibuka.\nJadwal berikutnya: ${next.periodLabel} (tenggat ${next.deadlineText} WITA).`
-            : 'Periode laporan saat ini belum dibuka. Cek jadwal dengan !tenggat.',
+            : 'Periode laporan saat ini belum dibuka. Cek jadwal dengan !check.',
         )
       }
 

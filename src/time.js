@@ -1,8 +1,8 @@
 import { config } from './config.js'
 import * as db from './db.js'
 
-export const DAY = 24 * 60 * 60 * 1000
-export const WEEK = 7 * DAY
+const DAY = 24 * 60 * 60 * 1000
+const WEEK = 7 * DAY
 
 const DAY_INDEX = {
   senin: 0, selasa: 1, rabu: 2, kamis: 3, jumat: 4, sabtu: 5, minggu: 6,
@@ -78,7 +78,15 @@ export function parseDeadline(str) {
     const hour = Number(m[1])
     const minute = Number(m[2])
     if (hour > 23 || minute > 59) return null
-    return { day: null, hour, minute }
+    return { day: null, dayType: null, hour, minute }
+  }
+  m = s.match(/^(\d{1,2})\s+(\d{1,2}):(\d{2})$/)
+  if (m) {
+    const dom = Number(m[1])
+    const hour = Number(m[2])
+    const minute = Number(m[3])
+    if (dom < 1 || dom > 31 || hour > 23 || minute > 59) return null
+    return { day: dom, dayType: 'dom', hour, minute }
   }
   m = s.match(/^([A-Za-z]+)\s+(\d{1,2}):(\d{2})$/)
   if (!m) return null
@@ -87,14 +95,15 @@ export function parseDeadline(str) {
   const hour = Number(m[2])
   const minute = Number(m[3])
   if (hour > 23 || minute > 59) return null
-  return { day, hour, minute }
+  return { day, dayType: 'weekday', hour, minute }
 }
 
 export function formatDeadline(str = config.deadline) {
   const p = parseDeadline(str)
   if (!p) return str
   const t = formatTime(p.hour, p.minute)
-  return p.day === null ? t : `${DAY_NAMES[p.day]} ${t}`
+  if (p.day === null) return t
+  return p.dayType === 'dom' ? `tgl ${p.day} ${t}` : `${DAY_NAMES[p.day]} ${t}`
 }
 
 function formatTime(hour, minute) {
@@ -119,6 +128,7 @@ const CADENCE_LABEL = {
   daily: 'harian',
   weekly: 'mingguan',
   semimonthly: '2x sebulan',
+  monthly: '1x sebulan',
 }
 
 /** Deskripsi jadwal untuk ditampilkan, mis. "2x sebulan · tenggat 11:30 WITA". */
@@ -145,6 +155,13 @@ export function setGroupSchedule(gid, schedule) {
   if (!schedule) delete all[gid]
   else all[gid] = { cadence: schedule.cadence, deadline: schedule.deadline }
   db.set('settings', 'groups', all)
+}
+
+/** Grup monthly hanya aktif di hari tenggatnya; cadence lain selalu aktif. */
+export function isGroupActive(gid, date = new Date()) {
+  const schedule = groupSchedule(gid)
+  if (schedule.cadence !== 'monthly') return true
+  return !!scheduleState(date, schedule)
 }
 
 /**
@@ -200,6 +217,22 @@ export function scheduleState(now, schedule) {
     })
   }
 
+  // 1x sebulan: bot aktif HANYA 1 hari (tanggal tenggat); sisa bulan null (diam total).
+  if (cad === 'monthly') {
+    const p = parseDeadline(schedule.deadline)
+    if (!p || p.dayType !== 'dom' || f.day !== p.day) return null
+    const start = realInstantOf(f.year, f.month, p.day, 0, 0)
+    const end = realInstantOf(f.year, f.month, p.day + 1, 0, 0)
+    const instant = realInstantOf(f.year, f.month, p.day, p.hour, p.minute)
+    return mkState({
+      cadence: 'monthly', periodId: `${f.year}-${String(f.month).padStart(2, '0')}`,
+      periodStart: start, periodEnd: end, instant,
+      deadlineText: formatDeadline(schedule.deadline),
+      periodLabel: `${f.day} ${MONTHS[f.month - 1]} ${f.year}`,
+      reminderAtInstant: true,
+    })
+  }
+
   return null
 }
 
@@ -236,21 +269,29 @@ export function nextPeriodInfo(now, schedule) {
       if (m === 12) { y = Number(f.year) + 1; m = 1 } else m += 1
       startDay = 1; deadlineDay = 3
     }
-    const start = realInstantOf(y, m, startDay, 0, 0)
-    const end = realInstantOf(y, m, deadlineDay + 2, 0, 0)
-    const instant = realInstantOf(y, m, deadlineDay, p.hour, p.minute)
     return {
       periodId: `${y}-${String(m).padStart(2, '0')}-${String(startDay).padStart(2, '0')}`,
-      periodLabel: rangeLabel(start, end), deadlineText: formatDeadline(schedule.deadline),
-      start, instant, end,
+      periodLabel: rangeLabel(realInstantOf(y, m, startDay, 0, 0), realInstantOf(y, m, deadlineDay + 2, 0, 0)),
+      deadlineText: formatDeadline(schedule.deadline),
+    }
+  }
+
+  // 1x sebulan: info bulan berjalan (sebelum tgl tenggat) atau bulan depan (sesudahnya).
+  if (cad === 'monthly') {
+    const p = parseDeadline(schedule.deadline)
+    if (!p || p.dayType !== 'dom') return null
+    if (f.day === p.day) return null
+    let y = f.year
+    let m = f.month
+    if (f.day > p.day) {
+      if (m === 12) { y = Number(f.year) + 1; m = 1 } else m += 1
+    }
+    return {
+      periodId: `${y}-${String(m).padStart(2, '0')}`,
+      periodLabel: `${p.day} ${MONTHS[m - 1]} ${y}`,
+      deadlineText: formatDeadline(schedule.deadline),
     }
   }
 
   return null
-}
-
-/** True jika `date` berada di "sudah lewat tenggat" untuk jadwal grup itu. */
-export function isAfterDeadline(date, schedule) {
-  const st = scheduleState(date, schedule)
-  return st ? date.getTime() >= st.instant : false
 }

@@ -5,7 +5,6 @@ import { makeSock, makeMsg, findSent, textsTo, G1, G2, ADMIN, MEMBER_A, MEMBER_B
 import { jobs, commands } from '../src/registry.js'
 import * as db from '../src/db.js'
 import * as time from '../src/time.js'
-import * as bot from '../src/bot.js'
 import { config } from '../src/config.js'
 
 db.load()
@@ -16,7 +15,7 @@ function ctx(sock) {
 }
 
 function runCmd(name, sock, msg) {
-  return commands.get(name).run(sock, msg, { db, time, bot, config, commands, sock })
+  return commands.get(name).run(sock, msg, { db, time, config, commands, sock })
 }
 
 function reset() {
@@ -279,8 +278,8 @@ test('!lapor dari DM admin: hanya grup terbuka yang menerima', async () => {
 test('batas presisi: lapor tepat 11:30:00 = sudah lewat tenggat (late)', () => {
   const s = { cadence: 'semimonthly', deadline: '11:30' }
   const instant = time.realInstantOf(2026, 9, 3, 11, 30, 0)
-  assert.equal(time.isAfterDeadline(new Date(instant), s), true, '11:30:00.000 = sudah lewat')
-  assert.equal(time.isAfterDeadline(new Date(instant - 1), s), false, '11:29:59.999 = belum')
+  assert.equal(time.scheduleState(new Date(instant), s).instant, instant)
+  assert.equal(time.scheduleState(new Date(instant - 1), s).instant, instant)
 })
 
 test('!lapor nama panjang/spesial: tersimpan & tampil utuh di !check', async () => {

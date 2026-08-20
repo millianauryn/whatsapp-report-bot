@@ -32,12 +32,6 @@ node index.js
 
 # Atau pakai kode pairing (lebih mudah untuk server jauh)
 node index.js --pair 6281234567890
-
-#### Langkah pairing (untuk server jauh)
-1. Jalankan `node index.js --pair 628...0` → muncul kode 8-digit
-2. Buka WhatsApp di HP nomor bot → `Imcom > Undang > Masukkan kode`
-3. Tunggu sampai log tampil `Login sebagai: 628...@s.whatsapp.net`
-4. Kode pairing **kadaluarsa 2 menit** — jika gagal, jalankan ulang perintah
 ```
 
 - Setelah login, sesi tersimpan **terenkripsi** (AES-256-GCM) dalam satu file `auth_info/session.enc` — mulai ulang tidak perlu scan ulang.
@@ -177,21 +171,12 @@ Bot **hanya bekerja di grup yang link undangannya terdaftar** di `config.json` �
 | `!check` | Admin | Lihat list siapa sudah/belum lapor (tanpa DM) |
 | `!bantuan` | Semua | Bantuan |
 
-#### Format `!lapor`
-- `!lapor <nama>` — cukup sebutkan nama penuh (boleh 2 kata, misal `!lapor Budi Santoso`)
-- Spasi berlebih di awal/akhir otomatis dipotong
-- Bot hanya terima **1 laporan per orang per periode** (ganti periode otomatis)
-- Contoh error jika salah ketik:
-  - `!kirim Budi` → `❓ Perintah tidak dikenal. Ketik !bantuan`
-  - `!lapor` (kosong) → `❓ Format: !lapor <nama>`
-  - `!lapor Budi` di luar jadwal → `⏸️ Jadwal aktif: 1–4 & 15–18. Coba lagi nanti.`
-
 ## Alur Otomatis (per jadwal grup)
 
 ```txt
-jendela reminder                    tenggat lewat
+jendela reminder                    tenggot lewat
 (60 mnt sebelum, atau pas jam       (real-time, ±30 detik)
- untuk 2xsebulan)         ───────►  DM "tenggat lewat" + recap grup
+ untuk 2xsebulan)         ───────►  DM "tenggot lewat" + recap grup
 DM "jangan lupa lapor"              (1x per periode)
 (ke yang belum lapor)
 ```
@@ -240,13 +225,3 @@ File langsung terdaftar otomatis via `src/registry.js` — tanpa mengubah file l
 - DM baru bisa terkirim jika nomor bot sudah disimpan kontak peserta
   / peserta pernah membalas bot.
 - Data tersimpan di `data.json` — backup file ini bila perlu.
-
-## Troubleshooting
-
-| Error | Solusi |
-| --- | --- |
-| `!lapor` diblok (`⏸️`) | Luar jadwal (tgl 5–14, 19–31). Cek `!bantuan` |
-| `Login sebagai:` tidak muncul | Cek koneksi WA / ulangi pairing |
-| `replaced` di log | Ada instance lain — matikan satu, hapus `bot.lock` |
-| Session corrupt (stuck scan QR berulang) | Hapus `auth_info/`, pairing ulang |
-
