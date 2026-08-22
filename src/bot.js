@@ -40,20 +40,62 @@ export async function isController(sock, groupIds, userJid) {
 }
 
 /** Peserta non-admin non-bot (anggota biasa). */
-export function memberParticipants(meta, myJid) {
+export function memberParticipants(meta, myJid, botLid) {
   return (meta?.participants || []).filter((p) => {
     if (p.id === myJid) return false
+    if (p.id === botLid) return false
     if (config.exclude_admins && (p.admin === 'admin' || p.admin === 'superadmin')) return false
     return true
   })
 }
 
 /** Daftar peserta grup yang belum lapor (tidak termasuk bot, opsional admin). */
-export function nonReporters(myJid, meta, reports = {}) {
+export function nonReporters(myJid, meta, reports = {}, botLid) {
   return (meta?.participants || []).filter((p) => {
     if (p.id === myJid) return false
+    if (p.id === botLid) return false
     if (config.exclude_admins && (p.admin === 'admin' || p.admin === 'superadmin')) return false
     return !reports[p.id]
+  })
+}
+
+/** Ambil identitas bot: PN (628...@s.whatsapp.net) dan LID (xxx:xx@lid). */
+export function getBotIdentifiers(sock) {
+  const pn = botJidOf(sock)
+  const lid = sock?.user?.id
+  return { pn, lid }
+}
+
+/** Resolve LID ke PN menggunakan contact list WhatsApp. Untuk LID modern, kirim ke LID langsung. */
+export async function resolveLidToPn(sock, lid) {
+  try {
+    const contact = await sock.fetchContact(lid)
+    console.log(`[resolve] ${lid} -> fetchContact ${contact?.id||'null'}`)
+    if (contact?.id && contact.id.endsWith('@s.whatsapp.net')) return contact.id
+    return lid
+  } catch(e) {
+    console.log(`[resolve] ${lid} fetchContact fail ${e.message} -> keep lid`)
+    return lid
+  }
+}
+
+/** Batch resolve multiple LIDs ke PNs. */
+export async function resolveLidsToPns(sock, lids) {
+  const results = {}
+  for (const lid of lids) {
+    results[lid] = await resolveLidToPn(sock, lid)
+  }
+  return results
+}
+
+/** Queue group mention fallback ketika DM gagal. */
+export async function queueGroupMention(gid, targetLid, text) {
+  const { messageQueue } = await import('./messageQueue.js')
+  messageQueue.enqueue({
+    jid: gid,
+    text: `@${targetLid.split('@')[0]} ${text}`,
+    mentions: [targetLid],
+    type: 'mention'
   })
 }
 
@@ -69,13 +111,21 @@ export function captureName(dbStore, jid, pushName) {
 }
 
 /** Baris list laporan untuk recap & !check. */
-export function reportListLines(done, due, dbStore, doneLabel = 'Sudah lapor') {
+export function reportListLines(done, due, dbStore, doneLabel = 'Sudah lapor', botIdentifiers = {}) {
+  const botPn = botIdentifiers.pn?.replace(/:\d+@/, '@').split('@')[0] || ''
+  const botLid = botIdentifiers.lid?.split('@')[0] || ''
+  const isBot = (id) => {
+    if (!id) return false
+    const normalized = String(id).replace(/:\d+@/, '@').split('@')[0]
+    return normalized === botPn || normalized === botLid
+  }
+  
   return [
     `${doneLabel} (${done.length}):`,
-    done.length ? done.map((r) => `✅ ${r.name}`).join('\n') : '  -',
+    done.length ? done.filter(r => !isBot(r.jid)).map((r) => `✅ ${r.name}`).join('\n') : '  -',
     '',
     `Belum lapor (${due.length}):`,
-    due.length ? due.map((p) => `❌ ${dbStore.get('names', p.id, '') || p.id.split('@')[0]}`).join('\n') : '  -',
+    due.length ? due.filter(p => !isBot(p.id)).map((p) => `❌ ${dbStore.get('names', p.id, '') || p.id.split('@')[0]}`).join('\n') : '  -',
   ]
 }
 
@@ -139,7 +189,10 @@ export async function joinAllowedGroups(sock, links = config.allowed_group_links
 }
 
 export async function sendText(sock, jid, text, quoted) {
-  await sock.sendMessage(jid, { text }, quoted ? { quoted } : undefined)
+  const res = await sock.sendMessage(jid, { text }, quoted ? { quoted } : undefined)
+  console.log(`[sendText] to ${jid} id ${res?.key?.id||'?'} status ${res?.status||'?'}`)
+  // wait briefly for receipt
+  return res
 }
 
 export async function sendMention(sock, jid, text, mentionJids, quoted) {

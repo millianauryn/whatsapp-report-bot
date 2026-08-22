@@ -7,11 +7,12 @@ export function startScheduler(intervalMs, jobs, ctx) {
     running = true
     try {
       const now = new Date()
+      // console.log(`[scheduler] tick ${now.toISOString()} jobs=${jobs.map(j=>j.name).join(',')}`)
       for (const job of jobs) {
         try {
           await job.run(now, ctx)
         } catch (err) {
-          console.error(`[scheduler] Job "${job.name}" gagal:`, err?.message)
+          console.error(`[scheduler] Job "${job.name}" gagal:`, err?.message, err?.stack?.slice(0,200))
         }
       }
     } finally {

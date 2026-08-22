@@ -1,12 +1,13 @@
-import { groupMeta, botJidOf, nonReporters, sendText, sendMention, memberParticipants, reportListLines } from '../bot.js'
+import { groupMeta, botJidOf, nonReporters, sendText, sendMention, memberParticipants, reportListLines, getBotIdentifiers } from '../bot.js'
+import { getSummaryTime } from '../time.js'
 
-function recapLines(state, done, due, db, header, cadenceLabel, doneLabel = 'Sudah lapor') {
+function recapLines(state, done, due, db, header, cadenceLabel, doneLabel = 'Sudah lapor', botIdentifiers = {}) {
   return [
     header,
     `Jadwal: ${cadenceLabel}`,
     `Tenggat: ${state.deadlineText} WITA`,
     '',
-    ...reportListLines(done, due, db, doneLabel),
+    ...reportListLines(done, due, db, doneLabel, botIdentifiers),
   ]
 }
 
@@ -19,12 +20,12 @@ function recapLines(state, done, due, db, header, cadenceLabel, doneLabel = 'Sud
  */
 export default {
   name: 'deadlineAlert',
-  async run(now, { db, time, sock }) {
+  async run(now, { db, time, config, sock }) {
     if (!db.get('settings', 'alertEnabled', true)) return
 
     const sockObj = sock()
     if (!sockObj) return
-    const myJid = botJidOf(sockObj)
+    const { pn: myJid, lid: botLid } = getBotIdentifiers(sockObj)
     const groups = db.get('meta', 'groups', [])
     const day = time.dayKey(now)
     const t = now.getTime()
@@ -37,19 +38,24 @@ export default {
       const flags = db.get('flags', state.periodId, {})
       const cadenceLabel = time.describeSchedule(schedule)
 
-      // Prioritas jendela sempit dulu (summary 17:00 & summary akhir), lalu alert.
+      // Summary time dari config (default 17:00), kecuali semimonthly yang sudah di-handle
+      const summaryTime = time.getSummaryTime(schedule, config)
+      let summaryHour = 17, summaryMinute = 0
+      if (summaryTime) {
+        const [h, m] = summaryTime.split(':').map(Number)
+        summaryHour = h; summaryMinute = m
+      }
+
+      // Prioritas: summary harian (17:00) & summary akhir, tidak ada alert
       let event = null
       if (state.hasDailySummary && state.days.includes(day) && !flags[`${gid}:summary:${day}`]) {
         const f = time.localFields(now)
-        const s17 = time.realInstantOf(f.year, f.month, f.day, 17, 0)
-        // Tepat 17:00 saja (1 menit); lewat tidak terkirim. Flag mengunci 1x/hari.
-        if (t >= s17 && t < s17 + 60_000) event = { type: 'summary', flag: `${gid}:summary:${day}` }
+        const sSummary = time.realInstantOf(f.year, f.month, f.day, summaryHour, summaryMinute)
+        // Tepat jam yang dikonfigurasi (1 menit); lewat tidak terkirim. Flag mengunci 1x/hari.
+        if (t >= sSummary && t < sSummary + 60_000) event = { type: 'summary', flag: `${gid}:summary:${day}` }
       }
       if (!event && state.hasFinalSummary && !flags[`${gid}:final`]) {
         if (t >= state.periodEnd - 2 * 60_000 && t < state.periodEnd) event = { type: 'final', flag: `${gid}:final` }
-      }
-      if (!event && !flags[`${gid}:alert`]) {
-        if (t >= state.instant + state.alertDelayMs && t < state.periodEnd) event = { type: 'alert', flag: `${gid}:alert` }
       }
       if (!event) continue
 
@@ -61,8 +67,8 @@ export default {
       }
 
       const reports = db.get('reports', state.periodId, {})[gid] || {}
-      const due = nonReporters(myJid, meta, reports)
-      const memberIds = new Set(memberParticipants(meta, myJid).map((p) => p.id))
+      const due = nonReporters(myJid, meta, reports, botLid)
+      const memberIds = new Set(memberParticipants(meta, myJid, botLid).map((p) => p.id))
       const done = Object.entries(reports)
         .filter(([jid]) => memberIds.has(jid))
         .map(([, r]) => r)
@@ -72,39 +78,6 @@ export default {
       db.set('flags', state.periodId, flags)
       console.log(`[deadlineAlert] ${event.type} ${gid} periode ${state.periodId}`)
 
-      if (event.type === 'alert') {
-        const custom = db.get('settings', 'alertDmText', '')
-        const defaultText = [
-          `Tenggat Laporan Sudah Lewat - ${state.periodLabel}`,
-          '',
-          'Halo{nama}, kamu BELUM mengirim laporan dan tenggat ({tenggat} WITA) sudah lewat.',
-          '',
-          'Kamu masih bisa kirim laporan:',
-          '!lapor <nama>',
-        ].join('\n')
-        const template = custom || defaultText
-        for (const p of due) {
-          const name = db.get('names', p.id, '') || ''
-          const text = template
-            .replaceAll('{nama}', name ? ` ${name}` : '')
-            .replaceAll('{tenggat}', state.deadlineText)
-            .replaceAll('{periode}', state.periodLabel)
-          try {
-            await sendText(sockObj, p.id, text)
-          } catch (err) {
-            console.error(`[deadlineAlert] Gagal DM ${p.id}:`, err?.message)
-          }
-        }
-        const lines = recapLines(state, done, due, db, `*Tenggat Laporan Lewat - ${state.periodLabel}*`, cadenceLabel)
-        lines.push('', 'DM pengingat sudah dikirim ke yang belum lapor.')
-        try {
-          await sendMention(sockObj, gid, lines.join('\n'), due.map((p) => p.id))
-        } catch (err) {
-          console.error(`[deadlineAlert] Gagal kirim recap di ${gid}:`, err?.message)
-        }
-        continue
-      }
-
       const header = event.type === 'final'
         ? `*Summary Terakhir - ${state.periodLabel}*`
         : `*Summary Harian ${time.formatDateLabel(now)} - ${state.periodLabel}*`
@@ -113,7 +86,7 @@ export default {
       const doneList = isDaily
         ? done.filter((r) => r.time && time.dayKey(new Date(r.time)) === day)
         : done
-      const lines = recapLines(state, doneList, due, db, header, cadenceLabel, isDaily ? 'Sudah lapor hari ini' : undefined)
+      const lines = recapLines(state, doneList, due, db, header, cadenceLabel, isDaily ? 'Sudah lapor hari ini' : undefined, { pn: myJid, lid: botLid })
       if (event.type === 'final') {
         lines.push('', 'Periode berakhir malam ini (24:00 WITA).')
         // Cari jadwal berikutnya dari akhir periode (karena saat ini masih di hari terakhir)

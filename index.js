@@ -1,5 +1,5 @@
 import qrcode from 'qrcode-terminal'
-import { existsSync, readFileSync, writeFileSync, unlinkSync } from 'node:fs'
+import { existsSync, readFileSync, writeFileSync, unlinkSync, watchFile } from 'node:fs'
 import { config } from './src/config.js'
 import * as db from './src/db.js'
 import * as time from './src/time.js'
@@ -8,6 +8,8 @@ import { commands, jobs } from './src/registry.js'
 import { startScheduler } from './src/scheduler.js'
 import { checkPermissionSafe } from './src/permissions.js'
 import { migrateData } from './src/migrate.js'
+import { messageQueue } from './src/messageQueue.js'
+import { healthServer } from './src/health.js'
 
 const COMMAND_PREFIX = '!'
 const LOCK_FILE = 'bot.lock'
@@ -57,6 +59,18 @@ async function main() {
   acquireLock()
 
   db.load()
+  console.log('[config] loaded groups', db.get('meta','groups',[]), 'settings', db.get('settings','groups',{}))
+
+  // Watch data.json for changes and reload config
+  const dataFilePath = config.data_file
+  watchFile(dataFilePath, { interval: 1000 }, () => {
+    try {
+      db.load()
+      console.log('[config] data.json changed, config reloaded', db.get('settings','groups',{}))
+    } catch (err) {
+      console.error('[config] Failed to reload data.json:', err.message)
+    }
+  })
 
   console.log('[bot] Bot Laporan WhatsApp dimulai...')
   console.log(`[bot] Zona waktu: ${config.timezone} | Jadwal default: ${config.deadline}`)
@@ -67,6 +81,9 @@ async function main() {
     db,
     time,
   }
+
+  // Load message queue
+  messageQueue.load()
 
   const botHandle = await bot.createBot({
     onQr(qr) {
@@ -79,6 +96,14 @@ async function main() {
       // Hanya grup dari link yang diizinkan yang di-join & dilayani; lalu preset jadwal.
       await bot.joinAllowedGroups(sock)
       migrateData()
+
+      // Start health server after bot is connected
+      globalThis.__botSock = botHandle.getSock
+      healthServer.setWaConnected(true)
+      await healthServer.start(
+        () => globalThis.__botSock?.(),
+        () => db.get('meta', 'groups', [])
+      )
     },
     onMessage(sock, m) {
       if (!m.message) return
@@ -86,6 +111,12 @@ async function main() {
       const jid = m.key.remoteJid
       const isGroup = jid.endsWith('@g.us')
       const sender = m.key.participant || jid
+
+      // Hanya layani grup allowlist — invite manual = diam total (tanpa health update / capture)
+      if (isGroup && !bot.shouldServeGroup(jid)) return
+
+      // Update health check timestamp
+      healthServer.updateLastMessageTime()
 
       // Grup berkadence monthly hanya aktif 1 hari per bulan; di luar itu diam total.
       if (isGroup && !time.isGroupActive(jid)) return
@@ -135,11 +166,26 @@ async function main() {
         }
       })
     },
+    onConnectionUpdate: (update) => {
+      if (update.connection === 'open') {
+        healthServer.setWaConnected(true)
+        console.log('[health] WhatsApp connected')
+      } else if (update.connection === 'close') {
+        healthServer.setWaConnected(false)
+        console.log('[health] WhatsApp disconnected:', update.lastDisconnect?.error?.message || 'unknown')
+      }
+    }
   })
 
 async function safeReply(sock, msg, text) {
   try {
-    await bot.reply(sock, msg, text)
+    // Queue the reply for resilience
+    messageQueue.enqueue({
+      jid: msg.jid,
+      text,
+      quoted: msg.key,
+      type: 'reply'
+    })
   } catch (err) {
     console.error('[cmd] Gagal mengirim balasan:', err?.message)
   }

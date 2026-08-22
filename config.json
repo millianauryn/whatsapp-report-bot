@@ -5,7 +5,22 @@
   "check_interval_seconds": 30,
   "exclude_admins": true,
   "allowed_group_links": [
+    "https://chat.whatsapp.com/HSFrpubAAEZBBfYGYWv8cV",
+    "https://chat.whatsapp.com/DICjOKwFdOj6jOInzDAnYp"
+
   ],
   "data_file": "data.json",
-  "auth_dir": "auth_info"
+  "auth_dir": "auth_info",
+  "health_port": 3000,
+  "health_host": "0.0.0.0",
+  "health_token": "",
+  "queue_file": "queue.jsonl",
+  "queue_flush_interval_ms": 500,
+  "queue_max_size": 10000,
+  "daily_reminder_at_deadline": true,
+  "daily_summary_time": "17:00",
+  "weekly_reminder_at_deadline": true,
+  "weekly_summary_time": "17:00",
+  "monthly_reminder_at_deadline": true,
+  "monthly_summary_time": "17:00"
 }

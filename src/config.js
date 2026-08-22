@@ -46,6 +46,25 @@ function allowedGroupLinks(val) {
   return ok
 }
 
+/** Validasi boolean dengan fallback. */
+function bool(val, fallback) {
+  if (typeof val === 'boolean') return val
+  if (typeof val === 'string') return val === 'true'
+  return fallback
+}
+
+/** Validasi waktu HH:MM dengan fallback. */
+function timeOfDay(val, fallback) {
+  const s = String(val ?? '').trim()
+  if (/^(\d{1,2}):(\d{2})$/.test(s)) {
+    const h = Number(s.split(':')[0])
+    const m = Number(s.split(':')[1])
+    if (h >= 0 && h <= 23 && m >= 0 && m <= 59) return s
+  }
+  console.log(`[config] time: ${JSON.stringify(val)} -> ${fallback} (otomatis diperbaiki)`)
+  return fallback
+}
+
 /** Validasi & perbaikan otomatis seluruh isi config. Dipakai saat start dan oleh test. */
 export function validateConfig(raw) {
   return {
@@ -57,6 +76,18 @@ export function validateConfig(raw) {
     allowed_group_links: allowedGroupLinks(raw.allowed_group_links),
     data_file: raw.data_file || 'data.json',
     auth_dir: raw.auth_dir || 'auth_info',
+    health_port: number(raw.health_port, 3000, 1, 'health_port'),
+    health_host: raw.health_host || '0.0.0.0',
+    health_token: raw.health_token || '',
+    queue_file: raw.queue_file || 'queue.jsonl',
+    queue_flush_interval_ms: number(raw.queue_flush_interval_ms, 500, 100, 'queue_flush_interval_ms'),
+    queue_max_size: number(raw.queue_max_size, 10000, 100, 'queue_max_size'),
+    daily_reminder_at_deadline: bool(raw.daily_reminder_at_deadline, true),
+    daily_summary_time: timeOfDay(raw.daily_summary_time, '17:00'),
+    weekly_reminder_at_deadline: bool(raw.weekly_reminder_at_deadline, true),
+    weekly_summary_time: timeOfDay(raw.weekly_summary_time, '17:00'),
+    monthly_reminder_at_deadline: bool(raw.monthly_reminder_at_deadline, true),
+    monthly_summary_time: timeOfDay(raw.monthly_summary_time, '17:00'),
   }
 }
 

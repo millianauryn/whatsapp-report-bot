@@ -1,4 +1,4 @@
-import { reply, groupMeta, botJidOf, nonReporters, sendText, memberParticipants, reportListLines } from '../bot.js'
+import { reply, groupMeta, botJidOf, nonReporters, sendText, memberParticipants, reportListLines, getBotIdentifiers } from '../bot.js'
 
 export default [
   {
@@ -12,7 +12,7 @@ export default [
         return reply(sock, m, 'Belum ada grup yang terdaftar. Tambahkan bot ke grup lewat link undangan yang diizinkan (config.allowed_group_links).')
       }
 
-      const myJid = botJidOf(sock)
+      const { pn: myJid, lid: botLid } = getBotIdentifiers(sock)
       const parts = []
 
       for (const gid of groupIds) {
@@ -42,8 +42,8 @@ export default [
         }
 
         const reports = db.get('reports', state.periodId, {})[gid] || {}
-        const due = nonReporters(myJid, meta, reports)
-        const memberIds = new Set(memberParticipants(meta, myJid).map((p) => p.id))
+        const due = nonReporters(myJid, meta, reports, botLid)
+        const memberIds = new Set(memberParticipants(meta, myJid, botLid).map((p) => p.id))
         const done = Object.entries(reports)
           .filter(([jid]) => memberIds.has(jid))
           .map(([, r]) => r)
@@ -52,7 +52,7 @@ export default [
         lines.push(`Jadwal: ${time.describeSchedule(schedule)}`)
         lines.push(`Tenggat: ${state.deadlineText} WITA`)
         lines.push('')
-        lines.push(...reportListLines(done, due, db))
+        lines.push(...reportListLines(done, due, db, 'Sudah lapor', { pn: myJid, lid: botLid }))
 
         parts.push({ gid, lines })
       }

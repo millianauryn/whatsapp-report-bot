@@ -295,3 +295,32 @@ export function nextPeriodInfo(now, schedule) {
 
   return null
 }
+
+/**
+ * Waktu reminder untuk cadence tertentu.
+ * - daily/weekly/monthly: jika config *_reminder_at_deadline=true -> at_deadline
+ * - semimonthly: always at deadline (reminderAtInstant: true)
+ * - fallback: before_deadline (menggunakan reminder_minutes_before)
+ */
+export function getReminderMode(schedule, config) {
+  const cad = schedule.cadence
+  if (cad === 'semimonthly') return 'at_deadline'
+  if (cad === 'daily' && config.daily_reminder_at_deadline) return 'at_deadline'
+  if (cad === 'weekly' && config.weekly_reminder_at_deadline) return 'at_deadline'
+  if (cad === 'monthly' && config.monthly_reminder_at_deadline) return 'at_deadline'
+  return 'before_deadline'
+}
+
+/**
+ * Waktu summary untuk cadence tertentu.
+ * - daily/weekly/monthly: dari config *_summary_time (default 17:00)
+ * - semimonthly: handled by existing logic (hasDailySummary: true)
+ */
+export function getSummaryTime(schedule, config) {
+  const cad = schedule.cadence
+  if (cad === 'semimonthly') return null // handled by hasDailySummary
+  if (cad === 'daily') return config.daily_summary_time
+  if (cad === 'weekly') return config.weekly_summary_time
+  if (cad === 'monthly') return config.monthly_summary_time
+  return '17:00'
+}
