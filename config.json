@@ -5,9 +5,6 @@
   "check_interval_seconds": 30,
   "exclude_admins": true,
   "allowed_group_links": [
-    "https://chat.whatsapp.com/HSFrpubAAEZBBfYGYWv8cV",
-    "https://chat.whatsapp.com/DICjOKwFdOj6jOInzDAnYp"
-
   ],
   "data_file": "data.json",
   "auth_dir": "auth_info",
