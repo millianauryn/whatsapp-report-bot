@@ -1,5 +1,5 @@
 import qrcode from 'qrcode-terminal'
-import { existsSync, readFileSync, writeFileSync, unlinkSync, watchFile } from 'node:fs'
+import { existsSync, readFileSync, writeFileSync, unlinkSync } from 'node:fs'
 import { config } from './src/config.js'
 import * as db from './src/db.js'
 import * as time from './src/time.js'
@@ -8,69 +8,15 @@ import { commands, jobs } from './src/registry.js'
 import { startScheduler } from './src/scheduler.js'
 import { checkPermissionSafe } from './src/permissions.js'
 import { migrateData } from './src/migrate.js'
-import { messageQueue } from './src/messageQueue.js'
+
 import { healthServer } from './src/health.js'
 
 const COMMAND_PREFIX = '!'
-const LOCK_FILE = 'bot.lock'
-
-/** Cegah dua instance bot berjalan bersamaan (penyebab konflik sesi WhatsApp). */
-function acquireLock() {
-  if (existsSync(LOCK_FILE)) {
-    try {
-      const pid = Number(readFileSync(LOCK_FILE, 'utf8'))
-      if (pid > 0 && isProcessAlive(pid)) {
-        console.error(`[lock] Instance bot lain masih berjalan (PID ${pid}).`)
-        console.error('[lock] Hentikan dulu, lalu jalankan ulang.')
-        process.exit(1)
-      }
-      console.warn(`[lock] File lock basi (PID ${pid} tidak aktif), diambil alih.`)
-    } catch (err) {
-      console.warn('[lock] File lock tidak dapat dibaca, ditimpa.')
-    }
-  }
-  writeFileSync(LOCK_FILE, String(process.pid))
-}
-
-function isProcessAlive(pid) {
-  try {
-    process.kill(pid, 0)
-    return true
-  } catch (err) {
-    return err.code === 'EPERM'
-  }
-}
-
-function releaseLock() {
-  try {
-    if (Number(readFileSync(LOCK_FILE, 'utf8')) === process.pid) unlinkSync(LOCK_FILE)
-  } catch {
-    /* file lock sudah tidak ada */
-  }
-}
-
-function normalizePhone(phone) {
-  let digits = String(phone).replace(/\D/g, '')
-  if (digits.startsWith('0')) digits = `62${digits.slice(1)}`
-  return digits
-}
 
 async function main() {
-  acquireLock()
 
   db.load()
   console.log('[config] loaded groups', db.get('meta','groups',[]), 'settings', db.get('settings','groups',{}))
-
-  // Watch data.json for changes and reload config
-  const dataFilePath = config.data_file
-  watchFile(dataFilePath, { interval: 1000 }, () => {
-    try {
-      db.load()
-      console.log('[config] data.json changed, config reloaded', db.get('settings','groups',{}))
-    } catch (err) {
-      console.error('[config] Failed to reload data.json:', err.message)
-    }
-  })
 
   console.log('[bot] Bot Laporan WhatsApp dimulai...')
   console.log(`[bot] Zona waktu: ${config.timezone} | Jadwal default: ${config.deadline}`)
@@ -81,9 +27,6 @@ async function main() {
     db,
     time,
   }
-
-  // Load message queue
-  messageQueue.load()
 
   const botHandle = await bot.createBot({
     onQr(qr) {
@@ -98,10 +41,9 @@ async function main() {
       migrateData()
 
       // Start health server after bot is connected
-      globalThis.__botSock = botHandle.getSock
       healthServer.setWaConnected(true)
       await healthServer.start(
-        () => globalThis.__botSock?.(),
+        () => botHandle.getSock(),
         () => db.get('meta', 'groups', [])
       )
     },
@@ -201,7 +143,8 @@ async function safeReply(sock, msg, text) {
   if (pairIdx > -1) {
     const phone = process.argv[pairIdx + 1]
     if (phone) {
-      const number = normalizePhone(phone)
+      const digits = String(phone).replace(/\D/g, '')
+      const number = digits.startsWith('0') ? `62${digits.slice(1)}` : digits
       setTimeout(async () => {
         try {
           const code = await botHandle.getSock().requestPairingCode(number)
@@ -224,12 +167,9 @@ main().catch((err) => {
 for (const sig of ['SIGINT', 'SIGTERM']) {
   process.on(sig, () => {
     console.log(`\n[bot] ${sig} diterima, berhenti...`)
-    releaseLock()
     process.exit(0)
   })
 }
-
-process.on('exit', releaseLock)
 
 // Error tak terduga tidak boleh mematikan bot secara senyap.
 process.on('unhandledRejection', (reason) => {

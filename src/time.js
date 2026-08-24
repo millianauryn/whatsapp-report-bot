@@ -142,7 +142,7 @@ export function describeSchedule(schedule) {
 export function groupSchedule(gid) {
   const s = db.get('settings', 'groups', {})[gid]
   if (s && CADENCE_LABEL[s.cadence] && s.deadline) {
-    return { cadence: s.cadence, deadline: s.deadline }
+    return { cadence: s.cadence, deadline: s.deadline, summary_time: s.summary_time }
   }
   const d = config.deadline
   const p = parseDeadline(d)
@@ -153,8 +153,20 @@ export function groupSchedule(gid) {
 export function setGroupSchedule(gid, schedule) {
   const all = db.get('settings', 'groups', {})
   if (!schedule) delete all[gid]
-  else all[gid] = { cadence: schedule.cadence, deadline: schedule.deadline }
+  else {
+    const prev = all[gid] || {}
+    all[gid] = { cadence: schedule.cadence, deadline: schedule.deadline, summary_time: prev.summary_time }
+  }
   db.set('settings', 'groups', all)
+}
+
+export function setGroupSummaryTime(gid, summary_time) {
+  const all = db.get('settings', 'groups', {})
+  if (all[gid]) {
+    if (!summary_time) delete all[gid].summary_time
+    else all[gid].summary_time = summary_time
+    db.set('settings', 'groups', all)
+  }
 }
 
 /** Grup monthly hanya aktif di hari tenggatnya; cadence lain selalu aktif. */
@@ -180,6 +192,7 @@ export function scheduleState(now, schedule) {
     return mkState({
       cadence: 'daily', periodId: dayKey(now), periodStart: start, periodEnd: start + DAY,
       instant, deadlineText: formatDeadline(schedule.deadline), periodLabel: formatDateLabel(now),
+      hasDailySummary: true,
     })
   }
 
@@ -193,6 +206,7 @@ export function scheduleState(now, schedule) {
     return mkState({
       cadence: 'weekly', periodId: pid, periodStart: ws, periodEnd: ws + WEEK,
       instant, deadlineText: formatDeadline(schedule.deadline), periodLabel: rangeLabel(ws, ws + WEEK),
+      hasDailySummary: true,
     })
   }
 
@@ -229,6 +243,7 @@ export function scheduleState(now, schedule) {
       periodStart: start, periodEnd: end, instant,
       deadlineText: formatDeadline(schedule.deadline),
       periodLabel: `${f.day} ${MONTHS[f.month - 1]} ${f.year}`,
+      hasDailySummary: true,
       reminderAtInstant: true,
     })
   }
@@ -302,12 +317,12 @@ export function nextPeriodInfo(now, schedule) {
  * - semimonthly: always at deadline (reminderAtInstant: true)
  * - fallback: before_deadline (menggunakan reminder_minutes_before)
  */
-export function getReminderMode(schedule, config) {
+export function getReminderMode(schedule, cfg = config) {
   const cad = schedule.cadence
   if (cad === 'semimonthly') return 'at_deadline'
-  if (cad === 'daily' && config.daily_reminder_at_deadline) return 'at_deadline'
-  if (cad === 'weekly' && config.weekly_reminder_at_deadline) return 'at_deadline'
-  if (cad === 'monthly' && config.monthly_reminder_at_deadline) return 'at_deadline'
+  if (cad === 'daily' && cfg.daily_reminder_at_deadline) return 'at_deadline'
+  if (cad === 'weekly' && cfg.weekly_reminder_at_deadline) return 'at_deadline'
+  if (cad === 'monthly' && cfg.monthly_reminder_at_deadline) return 'at_deadline'
   return 'before_deadline'
 }
 
@@ -316,11 +331,12 @@ export function getReminderMode(schedule, config) {
  * - daily/weekly/monthly: dari config *_summary_time (default 17:00)
  * - semimonthly: handled by existing logic (hasDailySummary: true)
  */
-export function getSummaryTime(schedule, config) {
+export function getSummaryTime(schedule, cfg = config) {
   const cad = schedule.cadence
   if (cad === 'semimonthly') return null // handled by hasDailySummary
-  if (cad === 'daily') return config.daily_summary_time
-  if (cad === 'weekly') return config.weekly_summary_time
-  if (cad === 'monthly') return config.monthly_summary_time
+  if (schedule.summary_time) return schedule.summary_time
+  if (cad === 'daily') return cfg.daily_summary_time
+  if (cad === 'weekly') return cfg.weekly_summary_time
+  if (cad === 'monthly') return cfg.monthly_summary_time
   return '17:00'
 }

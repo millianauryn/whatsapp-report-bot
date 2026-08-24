@@ -2,6 +2,7 @@ import { createServer } from 'node:http'
 import { config } from './config.js'
 import * as db from './db.js'
 import * as bot from './bot.js'
+import * as time from './time.js'
 
 const HEALTH_PORT = process.env.BOT_HEALTH_PORT || config.health_port || 3000
 const HEALTH_HOST = process.env.BOT_HEALTH_HOST || config.health_host || '0.0.0.0'
@@ -43,37 +44,27 @@ function getStatus() {
 
 function createHandler(sockGetter, groupsGetter) {
   return async (req, res) => {
-    if (req.url?.startsWith('/test-dm') && req.method === 'POST') {
+    if (req.url?.startsWith('/set-group-summary-time') && req.method === 'POST') {
       if (!checkAuth(req)) { res.writeHead(401); res.end('Unauthorized'); return }
       let body=''; for await(const c of req) body+=c
       try {
-        const { jid, text } = JSON.parse(body||'{}')
-        if(!jid||!text) throw new Error('need jid and text')
-        const sock = sockGetter?.()
-        if(!sock) throw new Error('sock not ready')
-        await sock.sendMessage(jid, { text })
-        res.writeHead(200, {'Content-Type':'application/json'}); res.end(JSON.stringify({ok:true, jid}))
-      } catch(e){ res.writeHead(500,{'Content-Type':'application/json'}); res.end(JSON.stringify({ok:false, error:e.message}))}
-      return
-    }
-    if (req.url?.startsWith('/restart') && req.method === 'POST') {
-      res.writeHead(200, {'Content-Type':'application/json'}); res.end(JSON.stringify({ok:true, restarting:true}))
-      setTimeout(()=> process.exit(0), 500)
-      return
-    }
-    if (req.url?.startsWith('/debug-group') && req.method === 'GET') {
-      try {
-        const gid = new URL(req.url, `http://${req.headers.host}`).searchParams.get('gid') || db.get('meta','groups',[])[0]
-        const sock = sockGetter?.()
-        if (!sock) throw new Error('sock not ready')
-        const meta = await sock.groupMetadata(gid)
-        const botIds = sock.user?.id || ''
+        const { gid, summary_time } = JSON.parse(body || '{}')
+        if (!gid || !/^([01]?\d|2[0-3]):[0-5]\d$/.test(summary_time || '')) throw new Error('need valid gid and summary_time')
+        const all = db.get('settings', 'groups', {})
+        if (!all[gid]) throw new Error('unknown group')
+        all[gid].summary_time = summary_time
+        db.set('settings', 'groups', all)
+        const today = time.dayKey(new Date())
+        const flags = db.get('flags', today, {})
+        delete flags[`${gid}:summary:${today}`]
+        db.set('flags', today, flags)
         res.writeHead(200, {'Content-Type':'application/json'})
-        res.end(JSON.stringify({ gid, subject: meta.subject, botId: botIds, participants: meta.participants.map(p=>({id:p.id, admin:p.admin, phoneNumber:p.phoneNumber||null})), count: meta.participants.length }, null, 2))
-      } catch(e){ res.writeHead(500,{'Content-Type':'application/json'}); res.end(JSON.stringify({ok:false, error:e.message}))}
+        res.end(JSON.stringify({ ok: true, gid, summary_time }))
+      } catch(e){ res.writeHead(400,{'Content-Type':'application/json'}); res.end(JSON.stringify({ok:false, error:e.message}))}
       return
     }
     if (req.url?.startsWith('/update-deadline') && req.method === 'POST') {
+      if (!checkAuth(req)) { res.writeHead(401); res.end('Unauthorized'); return }
       let body=''; for await(const c of req) body+=c
       try {
         const { deadline, gid } = JSON.parse(body||'{}')
@@ -82,11 +73,11 @@ function createHandler(sockGetter, groupsGetter) {
         if (gid) {
           all[gid] = { cadence:'daily', deadline }
           db.set('settings','groups', all)
-          // clear only this deadline flag
-          const today = new Date().toISOString().slice(0,10)
-          const flags = db.get('flags', today, {})
-          delete flags[`${gid}:reminder:${deadline}`]
-          db.set('flags', today, flags)
+          const today = time.dayKey(new Date())
+           const flags = db.get('flags', today, {})
+           delete flags[`${gid}:reminder:${deadline}`]
+           delete flags[`${gid}:summary:${today}`]
+           db.set('flags', today, flags)
           res.writeHead(200, {'Content-Type':'application/json'}); res.end(JSON.stringify({ok:true, deadline, gid}))
         } else {
           const groups = db.get('meta','groups',[])
@@ -107,7 +98,6 @@ function createHandler(sockGetter, groupsGetter) {
 
     const sock = sockGetter?.()
     const groups = groupsGetter?.() || []
-    const queueStats = globalThis.__messageQueue?.getStats?.() || { pending: 0 }
 
     const status = getStatus()
     const statusCode = status === 'healthy' ? 200 : status === 'degraded' ? 200 : 503
@@ -116,7 +106,6 @@ function createHandler(sockGetter, groupsGetter) {
       status,
       wa_connected: waConnected,
       uptime_ms: Math.floor(getUptime()),
-      queue_pending: queueStats.pending || 0,
       last_message_ms: lastMessageTime || null,
       connection_lost_ms: connectionLostTime,
       groups_served: groups.length,

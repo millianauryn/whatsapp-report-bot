@@ -48,7 +48,8 @@ export default {
 
       // Prioritas: summary harian (17:00) & summary akhir, tidak ada alert
       let event = null
-      if (state.hasDailySummary && state.days.includes(day) && !flags[`${gid}:summary:${day}`]) {
+      const daysMatch = !state.days || state.days.includes(day)
+      if (state.hasDailySummary && daysMatch && !flags[`${gid}:summary:${day}`]) {
         const f = time.localFields(now)
         const sSummary = time.realInstantOf(f.year, f.month, f.day, summaryHour, summaryMinute)
         // Tepat jam yang dikonfigurasi (1 menit); lewat tidak terkirim. Flag mengunci 1x/hari.

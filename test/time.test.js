@@ -69,7 +69,7 @@ test('scheduleState: 1x sebulan -> aktif HANYA di tanggal tenggat, sisa bulan nu
   assert.equal(st.periodLabel, '5 Agustus 2026')
   assert.equal(st.deadlineText, 'tgl 5 11:30')
   assert.equal(st.reminderAtInstant, true, 'reminder pas jam tenggat')
-  assert.equal(st.hasDailySummary, false, 'tanpa summary harian')
+  assert.equal(st.hasDailySummary, true, 'dengan summary harian')
   assert.equal(st.hasFinalSummary, false, 'tanpa summary terakhir')
   assert.equal(time.scheduleState(new Date('2026-08-04T02:00:00.000Z'), s), null, 'sehari sebelum = null')
   assert.equal(time.scheduleState(new Date('2026-08-06T02:00:00.000Z'), s), null, 'sehari setelah = null')
@@ -100,7 +100,7 @@ test('describeSchedule: label 1x sebulan', () => {
 test('groupSchedule: default config (tanpa hari = harian) + set/hapus override', () => {
   assert.equal(time.groupSchedule('x@g.us').cadence, 'daily', 'config "21:00" -> harian')
   time.setGroupSchedule('x@g.us', { cadence: 'weekly', deadline: 'Jumat 21:00' })
-  assert.deepEqual(time.groupSchedule('x@g.us'), { cadence: 'weekly', deadline: 'Jumat 21:00' })
+  assert.deepEqual(time.groupSchedule('x@g.us'), { cadence: 'weekly', deadline: 'Jumat 21:00', summary_time: undefined })
   time.setGroupSchedule('x@g.us', null)
   assert.equal(time.groupSchedule('x@g.us').cadence, 'daily', 'hapus override -> kembali default')
 })

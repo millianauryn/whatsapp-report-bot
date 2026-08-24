@@ -17,7 +17,7 @@ test('preset: tanpa pengaturan jadwal -> grup terdaftar dapat 2xsebulan 11:30', 
 
   migrateData()
 
-  assert.deepEqual(time.groupSchedule(G1), { cadence: 'semimonthly', deadline: '11:30' })
+  assert.deepEqual(time.groupSchedule(G1), { cadence: 'semimonthly', deadline: '11:30', summary_time: undefined })
 })
 
 test('preset: idempoten + jadwal custom grup tidak disentuh', () => {
@@ -27,13 +27,13 @@ test('preset: idempoten + jadwal custom grup tidak disentuh', () => {
 
   migrateData()
 
-  assert.deepEqual(time.groupSchedule(G1), { cadence: 'weekly', deadline: 'Jumat 21:00' }, 'jadwal custom dipertahankan')
-
+  assert.deepEqual(time.groupSchedule(G1), { cadence: 'weekly', deadline: 'Jumat 21:00', summary_time: undefined }, 'jadwal custom dipertahankan')
+  
   db.clear('settings')
   db.set('meta', 'groups', [G1])
   migrateData()
 
-  assert.deepEqual(time.groupSchedule(G1), { cadence: 'semimonthly', deadline: '11:30' }, 'pengaturan hilang -> preset kembali')
+  assert.deepEqual(time.groupSchedule(G1), { cadence: 'semimonthly', deadline: '11:30', summary_time: undefined }, 'pengaturan hilang -> preset kembali')
 
   time.setGroupSchedule(G1, null)
 })
@@ -47,8 +47,8 @@ test('preset: grup baru yang bergabung setelahnya ikut dipreset', () => {
   db.set('meta', 'groups', [G1, G2])
   migrateData()
 
-  assert.deepEqual(time.groupSchedule(G1), { cadence: 'weekly', deadline: 'Jumat 21:00' }, 'yang sudah punya jadwal tetap')
-  assert.deepEqual(time.groupSchedule(G2), { cadence: 'semimonthly', deadline: '11:30' }, 'grup baru dapat preset')
+  assert.deepEqual(time.groupSchedule(G1), { cadence: 'weekly', deadline: 'Jumat 21:00', summary_time: undefined }, 'yang sudah punya jadwal tetap')
+  assert.deepEqual(time.groupSchedule(G2), { cadence: 'semimonthly', deadline: '11:30', summary_time: undefined }, 'grup baru dapat preset')
 
   db.clear('settings')
   time.setGroupSchedule(G1, null)

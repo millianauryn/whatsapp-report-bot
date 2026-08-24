@@ -3,9 +3,9 @@ import { reply, isController, groupMeta } from '../bot.js'
 const USAGE = '!lapor <nama>'
 const EXAMPLE = 'Contoh: !lapor Budi Santoso'
 
-/** Nama saja; bila ada " - " (format lama), hanya bagian sebelum tanda itu yang dipakai. */
+/** Nama saja. */
 export function parseLapor(text) {
-  const name = text.trim().split(/\s*-\s*/)[0].trim()
+  const name = text.trim()
   if (!name) return null
   return { name, detail: '' }
 }

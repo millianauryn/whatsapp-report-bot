@@ -163,6 +163,30 @@ Setiap grup terdaftar otomatis mendapat **jadwal 2xsebulan** (preset dijalankan 
 
 > **Catatan:** Untuk cadence `daily`/`weekly`/`monthly`, reminder dikirim **pas jam tenggat** (bukan 60 menit sebelum) jika config `*_reminder_at_deadline: true` (default). Summary dikirim di waktu terkonfigurasi (`*_summary_time`, default 17:00). Alert selalu 1 menit setelah tenggat.
 
+### Ubah Summary Waktu (API)
+
+Gunakan API agar setting dan flag summary dikelola bot; tidak perlu mengedit `data.json` saat service berjalan.
+
+```bash
+# Ganti summary satu grup
+curl -s -X POST http://localhost:3000/set-group-summary-time \
+  -H "Content-Type: application/json" \
+  -d '{"gid":"120363411450968353@g.us","summary_time":"15:35"}'
+
+# Reset summary grup ke 17:00
+curl -s -X POST http://localhost:3000/set-group-summary-time \
+  -H "Content-Type: application/json" \
+  -d '{"gid":"120363411450968353@g.us","summary_time":"17:00"}'
+
+# Cek bot
+curl -s http://localhost:3000/health
+
+# Pantau pengiriman
+journalctl -u whatsapp-report-bot -f --no-pager | grep --line-buffered -E "120363411450968353|deadlineAlert|DM sent|Summary terkirim"
+```
+
+`summary_time` memakai waktu WITA format `HH:MM`. Grup tanpa setting ini memakai default global dari `config.json` (`17:00`).
+
 ## Referensi Lengkap: Setting Group & Cara Ganti Tenggat {#referensi-lengkap-setting-group--cara-ganti-tenggat}
 ### 1. Struktur Konfigurasi Files
 
@@ -575,6 +599,11 @@ curl -s -X POST http://localhost:3000/update-deadline \
 # ganti semua grup allowlist
 curl -s -X POST http://localhost:3000/update-deadline \
   -d '{"deadline":"10:00"}' | jq .
+
+# ganti summary 1 grup
+curl -s -X POST http://localhost:3000/set-group-summary-time \
+  -H "Content-Type: application/json" \
+  -d '{"gid":"120363411450968353@g.us","summary_time":"15:35"}' | jq .
 
 # verifikasi
 curl -s http://localhost:3000/health | jq .groups_served
