@@ -121,13 +121,7 @@ async function main() {
 
 async function safeReply(sock, msg, text) {
   try {
-    // Queue the reply for resilience
-    messageQueue.enqueue({
-      jid: msg.jid,
-      text,
-      quoted: msg.key,
-      type: 'reply'
-    })
+    await bot.sendText(sock, msg.jid, text)
   } catch (err) {
     console.error('[cmd] Gagal mengirim balasan:', err?.message)
   }

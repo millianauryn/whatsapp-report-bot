@@ -1,4 +1,9 @@
 # Bot Laporan WhatsApp
+
+Bot WhatsApp untuk mengumpulkan laporan dari peserta grup dengan **jadwal 2xsebulan** (ditetapkan otomatis per grup). Bot melacak siapa yang sudah lapor / belum, mengingatkan lewat **DM pribadi**, dan memberi tahu real-time saat tenggat lewat. Semua waktu mengikuti **zona WITA** (Asia/Makassar) — sesuai jam di HP pengguna.
+
+Dibangun dengan [Baileys](https://github.com/WhiskeysSockets/Baileys) (protocol WhatsApp Web). Gratis, tanpa biaya bulanan.
+
 # Daftar Isi
 
 - [Fitur](#fitur)
@@ -8,11 +13,32 @@
 - [Jadwal Per Grup](#jadwal-per-grup)
 - [Cara Ganti Tenggat](#cara-ganti-tenggat-resmi-dan-setup-group)
 - [Referensi Lengkap: Setting Group & Cara Ganti Tenggat](#referensi-lengkap-setting-group--cara-ganti-tenggat)
+- [Cara Bot Masuk Grup](#cara-bot-masuk-grup-hanya-link-yang-diizinkan)
+- [Perintah](#perintah-di-grup-awalan-)
+- [Alur Otomatis](#alur-otomatis-per-jadwal-grup)
+- [Health Check & Message Queue](#health-check--message-queue)
+- [Testing](#testing)
+- [Menambah Fitur Baru](#menambah-fitur-baru-sustainable)
+- [Syarat Bot Bekerja & Bisa Balas DM](#syarat-bot-bekerja--bisa-balas-dm)
 - [Troubleshooting](#troubleshooting)
 
-Bot WhatsApp untuk mengumpulkan laporan dari peserta grup dengan **jadwal 2xsebulan** (ditetapkan otomatis per grup). Bot melacak siapa yang sudah lapor / belum, mengingatkan lewat **DM pribadi**, dan memberi tahu real-time saat tenggat lewat. Semua waktu mengikuti **zona WITA** (Asia/Makassar) — sesuai jam di HP pengguna.
+## Dokumentasi Lengkap (folder `docs/`)
 
-Dibangun dengan [Baileys](https://github.com/WhiskeysSockets/Baileys) (protocol WhatsApp Web). Gratis, tanpa biaya bulanan.
+Konten yang sama tersedia terpisah per topik di folder `docs/`:
+
+| File | Isi |
+|---|---|
+| [docs/instalasi.md](docs/instalasi.md) | Persyaratan + instalasi + pairing server jauh |
+| [docs/konfigurasi.md](docs/konfigurasi.md) | Tabel `config.json` + jadwal per grup |
+| [docs/ganti-tenggat.md](docs/ganti-tenggat.md) | 3 metode ganti tenggat + struktur data.json + catatan debugging |
+| [docs/api.md](docs/api.md) | Endpoint HTTP (`/health`, `/update-deadline`, `/set-group-summary-time`) + contoh curl |
+| [docs/flag-datajson.md](docs/flag-datajson.md) | Pola key flag + periodId per cadence |
+| [docs/alur-jadwal.md](docs/alur-jadwal.md) | Alur otomatis semua cadence + cara bot masuk grup |
+| [docs/perintah.md](docs/perintah.md) | `!lapor`, `!check`, `!bantuan` + hak akses |
+| [docs/health-check.md](docs/health-check.md) | Health endpoint + message queue |
+| [docs/pengembangan.md](docs/pengembangan.md) | Testing + menambah fitur baru + catatan penting |
+| [docs/troubleshooting.md](docs/troubleshooting.md) | Syarat bot bekerja + tabel error/solusi |
+
 
 ## Fitur {#fitur}
 
@@ -150,18 +176,7 @@ journalctl -u whatsapp-report-bot --since "30s ago" | grep -E "Checking|inWindow
 
 Setelah restart dengan fix `normalizeId`, semua grup menjalani **daily 10:43** (atau deadline terakhir yang di-set via API). Cadence tetap `semimonthly` otomatis per grup baru via `src/migrate.js`.
 
-### 5. Catatan lanjutan: Jadwal 2xsebulan (referensi)
-
-Setiap grup terdaftar otomatis mendapat **jadwal 2xsebulan** (preset dijalankan saat bot terhubung; grup baru yang bergabung belakangan ikut dipreset). **Tidak ada perintah chat** untuk mengubahnya; reset dan pergantian periode sepenuhnya otomatis.
-
-| Cadence | Reminder | Summary | Alert |
-|---|---|---|---|
-| **2x sebulan** | Pas jam tenggat (mis. 11:30) | 17:00 harian selama cycle | 1 menit setelah tenggat |
-| **1x sebulan (monthly)** | Pas jam tenggat | Waktu terkonfigurasi (default 17:00) | 1 menit setelah tenggat |
-| **Mingguan (weekly)** | Pas jam tenggat | Waktu terkonfigurasi (default 17:00) | 1 menit setelah tenggat |
-| **Harian (daily)** | Pas jam tenggat | Waktu terkonfigurasi (default 17:00) | 1 menit setelah tenggat |
-
-> **Catatan:** Untuk cadence `daily`/`weekly`/`monthly`, reminder dikirim **pas jam tenggat** (bukan 60 menit sebelum) jika config `*_reminder_at_deadline: true` (default). Summary dikirim di waktu terkonfigurasi (`*_summary_time`, default 17:00). Alert selalu 1 menit setelah tenggat.
+Tabel jadwal per cadence: lihat [Jadwal Per Grup](#jadwal-per-grup).
 
 ### Ubah Summary Waktu (API)
 
@@ -290,6 +305,21 @@ Setiap grup terdaftar memiliki konfigurasi mandiri:
 }
 ```
 
+### Flag di `data.json`
+
+Flag adalah penanda internal agar reminder, alert, dan summary tidak terkirim dua kali dalam periode yang sama. Hanya pola berikut yang dibaca bot:
+
+| Pola key | Contoh | Fungsi |
+|---|---|---|
+| `<gid>:reminder:<tenggat>` | `120363411450968353@g.us:reminder:13:47` | Menandai reminder sudah terkirim |
+| `<gid>:alert` | `120363411450968353@g.us:alert` | Menandai alert dan recap sudah terkirim |
+| `<gid>:summary:<tanggal>` | `120363411450968353@g.us:summary:2026-08-24` | Menandai summary harian sudah terkirim |
+| `<gid>:final` | `120363411450968353@g.us:final` | Menandai summary terakhir sudah terkirim |
+
+Key di luar `flags` harus memakai `periodId` sesuai cadence: harian `YYYY-MM-DD`, mingguan tanggal Senin, semimonthly `YYYY-MM-01` atau `YYYY-MM-15`, dan monthly `YYYY-MM`. Key sembarang atau salah format akan diabaikan dan dapat menyebabkan pengiriman ulang.
+
+Jangan mengedit flag manual saat bot berjalan. Gunakan `POST /update-deadline` atau `POST /set-group-summary-time` agar flag grup terkait dibersihkan dengan benar. Job `periodReset` membersihkan data periode lama otomatis.
+
 ### 2. Cara Ganti Tenggat (3 Metode)
 
 #### Metode A: Via HTTP API (REKOMENDASI, AMAN, TIDAK PERNAH `Permission denied`)
@@ -343,21 +373,7 @@ curl -s -X POST http://localhost:3000/update-deadline \
 | `Permission denied` | Edit `data.json` manual saat bot `root` | Gunakan Metode A (API `POST /update-deadline`) |
 | `DM tidak sampai` (Error 463) | Nomor bot belum disimpan kontak / belum ada chat session | Simpan nomor bot di kontak peserta, atau kirim `!lapor` pertama kali dari bot |
 
-### 5. Jadwal yang Tersedia per Cadence
-
-| Cadence | Reminder | Summary | Alert |
-|---|---|---|---|
-| **2x sebulan** (semimonthly) | Pas jam tenggat (mis. 11:30) | 17:00 harian selama cycle | 1 menit setelah tenggat |
-| **1x sebulan** (monthly) | Pas jam tenggat | Waktu terkonfigurasi (default 17:00) | 1 menit setelah tenggat |
-| **Mingguan** (weekly) | Pas jam tenggat | Waktu terkonfigurasi (default 17:00) | 1 menit setelah tenggat |
-| **Harian** (daily) | Pas jam tenggat | Waktu terkonfigurasi (default 17:00) | 1 menit setelah tengkat |
-
-> **Catatan Penting:**  
-> - Reminder dikirim **pas jam tenggat** (bukan 60 menit sebelum) jika config `*_reminder_at_deadline: true` (default di `config.json`).  
-> - Summary dikirim di waktu terkonfigurasi (`*_summary_time`, default `"17:00"`).  
-> - Alert (reminder tambahan) selalu 1 menit setelah tenggat.  
-> - Untuk `monthly`: perhatikan field `dayOfMonth` di `data.json.settings.groups[gid]`.  
-> - Untuk `weekly`: perhatikan field `weekday` di `data.json.settings.groups[gid]` (0=Minggu, 1=Senin, …, 6=Sabtu).
+Tabel jadwal per cadence: lihat [Jadwal Per Grup](#jadwal-per-grup).
 
 ------
 **Alur jadwal `2xsebulan`** (tiap cycle):
@@ -467,34 +483,6 @@ Konfigurasi di `config.json`:
 }
 ```
 
-## Cara Bot Masuk Grup (hanya link yang diizinkan)
-
-Bot **hanya bekerja di grup yang link undangannya terdaftar** di `config.json` → `allowed_group_links`:
-
-1. Buat link undangan grup di WhatsApp (grup boleh terbuka/bebas bergabung, atau Anda sebagai admin menambahkan).
-2. Isi `allowed_group_links` dengan link tersebut (bisa lebih dari satu), lalu restart bot.
-3. Saat start, bot join grup dari tiap link, mendaftarkannya, dan mulai melayani (reminder/alert/recap hanya untuk grup itu).
-4. Grup yang pernah di-join tersimpan di `data.json` (`meta.joined_links`) — restart tidak akan join ulang, hanya memastikan grup tetap terdaftar.
-
-**Grup lain diabaikan total:** bot yang ditambahkan langsung ke grup lain (bukan via link diizinkan) tidak akan terdaftar, tidak membalas, dan tidak mengirim apa pun — termasuk DM reminder (DM hanya dikirim ke anggota grup yang diizinkan). Grup yang dikeluarkan bot-nya langsung berhenti dilayani.
-
-## Perintah (di grup, awalan `!`)
-
-| Perintah | Izin | Fungsi |
-|---|---|---|
-| `!lapor <nama>` | Semua | Kirim laporan (cukup nama) |
-| `!check` | Admin | Lihat list siapa sudah/belum lapor (tanpa DM) |
-| `!bantuan` | Semua | Bantuan |
-
-#### Format `!lapor`
-- `!lapor <nama>` — cukup sebutkan nama penuh (boleh 2 kata, misal `!lapor Budi Santoso`)
-- Spasi berlebih di awal/akhir otomatis dipotong
-- Bot hanya terima **1 laporan per orang per periode** (ganti periode otomatis)
-- Contoh error jika salah ketik:
-  - `!kirim Budi` → `❓ Perintah tidak dikenal. Ketik !bantuan`
-  - `!lapor` (kosong) → `❓ Format: !lapor <nama>`
-  - `!lapor Budi` di luar jadwal → `⏸️ Jadwal aktif: 1–4 & 15–18. Coba lagi nanti.`
-
 ## Testing
 
 ```bash
@@ -539,6 +527,7 @@ File langsung terdaftar otomatis via `src/registry.js` — tanpa mengubah file l
 - DM baru bisa terkirim jika nomor bot sudah disimpan kontak peserta
   / peserta pernah membalas bot.
 - Data tersimpan di `data.json` — backup file ini bila perlu.
+
 ## Syarat Bot Bekerja & Bisa Balas DM
 
 > **Catatan Penting:** Untuk bot bisa menjalankan fungsinya (reminder, DM, summary) dan merespon pesan dari pengguna, syarat-syarat berikut harus terpenuhi:
@@ -588,16 +577,19 @@ File langsung terdaftar otomatis via `src/registry.js` — tanpa mengubah file l
 | Health check `degraded` | Cek `last_message_ms` null = belum ada pesan masuk; tunggu pesan masuk |
 | Queue penuh | Perbesar `queue_max_size` atau cek koneksi WA |
 
+## Contoh Cepat (Copy-Paste)
 
+Perintah operasional lengkap ada di [docs/api.md](docs/api.md).
 
-
-# ganti 1 grup (tidak ganggu lain) {#ganti-1-grup-tidak-ganggu-lain}
+```bash
+# ganti 1 grup (tidak ganggu lain)
 curl -s -X POST http://localhost:3000/update-deadline \
   -H "Content-Type: application/json" \
   -d '{"gid":"120363411450968353@g.us","deadline":"10:00"}' | jq .
 
 # ganti semua grup allowlist
 curl -s -X POST http://localhost:3000/update-deadline \
+  -H "Content-Type: application/json" \
   -d '{"deadline":"10:00"}' | jq .
 
 # ganti summary 1 grup
@@ -608,3 +600,4 @@ curl -s -X POST http://localhost:3000/set-group-summary-time \
 # verifikasi
 curl -s http://localhost:3000/health | jq .groups_served
 journalctl -u whatsapp-report-bot --since "30s ago" | grep "loaded groups"
+```

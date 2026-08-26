@@ -323,3 +323,11 @@ test('db: data.json korup -> tidak crash, file ditulis ulang valid', () => {
   assert.equal(JSON.parse(readFileSync(file, 'utf8')).collections.test.x, 1, 'file valid kembali')
   db.del('test', 'x')
 })
+// ================= paritas jam summary: semua cadence rantai sama =================
+
+test('getSummaryTime: semimonthly hormati summary_time per-grup, fallback default 17:00', () => {
+  assert.equal(time.getSummaryTime({ cadence: 'semimonthly', deadline: '11:30', summary_time: '09:30' }), '09:30')
+  assert.equal(time.getSummaryTime({ cadence: 'semimonthly', deadline: '11:30' }), '17:00')
+  // cadence lain tidak berubah
+  assert.equal(time.getSummaryTime({ cadence: 'daily', deadline: '21:00', summary_time: '08:00' }), '08:00')
+})

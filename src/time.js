@@ -327,14 +327,12 @@ export function getReminderMode(schedule, cfg = config) {
 }
 
 /**
- * Waktu summary untuk cadence tertentu.
- * - daily/weekly/monthly: dari config *_summary_time (default 17:00)
- * - semimonthly: handled by existing logic (hasDailySummary: true)
+ * Waktu summary untuk semua cadence, rantai sama:
+ * summary_time per-grup -> config *_summary_time -> default '17:00'.
  */
 export function getSummaryTime(schedule, cfg = config) {
-  const cad = schedule.cadence
-  if (cad === 'semimonthly') return null // handled by hasDailySummary
   if (schedule.summary_time) return schedule.summary_time
+  const cad = schedule.cadence
   if (cad === 'daily') return cfg.daily_summary_time
   if (cad === 'weekly') return cfg.weekly_summary_time
   if (cad === 'monthly') return cfg.monthly_summary_time

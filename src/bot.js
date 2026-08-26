@@ -88,15 +88,9 @@ export async function resolveLidsToPns(sock, lids) {
   return results
 }
 
-/** Queue group mention fallback ketika DM gagal. */
-export async function queueGroupMention(gid, targetLid, text) {
-  const { messageQueue } = await import('./messageQueue.js')
-  messageQueue.enqueue({
-    jid: gid,
-    text: `@${targetLid.split('@')[0]} ${text}`,
-    mentions: [targetLid],
-    type: 'mention'
-  })
+/** Fallback mention grup ketika DM gagal (kirim langsung, tanpa antrean). */
+export async function queueGroupMention(sock, gid, targetLid, text) {
+  await sendMention(sock, gid, `@${targetLid.split('@')[0]} ${text}`, [targetLid])
 }
 
 /** Nama per nomor: nama dari !lapor selalu menang; nama WhatsApp (pushName)

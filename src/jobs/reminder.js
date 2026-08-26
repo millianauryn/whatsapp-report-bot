@@ -81,10 +81,10 @@ export default {
           console.log(`[reminder] DM sent to ${targetJid}`)
         } catch (err) {
           console.error(`[reminder] Gagal DM ${p.id} -> ${targetJid}:`, err?.message)
-          // Fallback: queue group mention
+          // Fallback: mention grup langsung
           if (err.message.includes('463') || err.message.includes('account restricted')) {
-            await queueGroupMention(gid, p.id, text)
-            console.log(`[reminder] Queued group mention fallback for ${p.id}`)
+            await queueGroupMention(sockObj, gid, p.id, text)
+            console.log(`[reminder] Mention grup fallback terkirim untuk ${p.id}`)
           }
           allSent = false
         }
