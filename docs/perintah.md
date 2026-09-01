@@ -5,7 +5,7 @@
 | Perintah | Izin | Fungsi |
 | --- | --- | --- |
 | `!lapor <nama>` | Semua | Kirim laporan (cukup nama) |
-| `!check` | Admin | Lihat list siapa sudah/belum lapor (tanpa DM) |
+| `!check` | Semua | Lihat list siapa sudah/belum lapor (tanpa DM) |
 | `!bantuan` | Semua | Bantuan |
 
 ## Format `!lapor`

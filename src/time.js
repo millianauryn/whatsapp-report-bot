@@ -169,11 +169,13 @@ export function setGroupSummaryTime(gid, summary_time) {
   }
 }
 
-/** Grup monthly hanya aktif di hari tenggatnya; cadence lain selalu aktif. */
+/** Grup monthly & semimonthly hanya aktif di dalam periodenya/cycle-nya; di luar itu diam total. Cadence daily & weekly selalu aktif. */
 export function isGroupActive(gid, date = new Date()) {
   const schedule = groupSchedule(gid)
-  if (schedule.cadence !== 'monthly') return true
-  return !!scheduleState(date, schedule)
+  if (schedule.cadence === 'monthly' || schedule.cadence === 'semimonthly') {
+    return !!scheduleState(date, schedule)
+  }
+  return true
 }
 
 /**

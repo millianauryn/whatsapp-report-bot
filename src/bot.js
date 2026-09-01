@@ -21,7 +21,7 @@ export async function groupMeta(sock, gid, force = false) {
 }
 
 export function isGroupAdmin(meta, userJid) {
-  const p = meta?.participants?.find((x) => x.id === userJid)
+  const p = meta?.participants?.find((x) => x.id === userJid || x.lid === userJid)
   return !!p && (p.admin === 'admin' || p.admin === 'superadmin')
 }
 

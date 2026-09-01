@@ -33,4 +33,4 @@ Bot **hanya bekerja di grup yang link undangannya terdaftar** di `config.json` �
 3. Saat start, bot join grup dari tiap link, mendaftarkannya, dan mulai melayani (reminder/alert/recap hanya untuk grup itu).
 4. Grup yang pernah di-join tersimpan di `data.json` (`meta.joined_links`) — restart tidak akan join ulang, hanya memastikan grup tetap terdaftar.
 
-**Grup lain diabaikan total:** bot yang ditambahkan langsung ke grup lain (bukan via link diizinkan) tidak akan terdaftar, tidak membalas, dan tidak mengirim apa pun — termasuk DM reminder (DM hanya dikirim ke anggota grup yang diizinkan). Grup yang dikeluarkan bot-nya langsung berhenti dilayani.
+**Grup lain diabaikan total:** bot yang ditambahkan langsung ke grup lain (bukan via link diizinkan) tidak akan terdaftar, tidak membalas, dan tidak mengirim recap atau summary. Grup yang dikeluarkan bot-nya langsung berhenti dilayani.

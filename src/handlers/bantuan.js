@@ -8,12 +8,12 @@ export default [
     async run(sock, m) {
       const lines = [
         '*Bantuan Bot Laporan*',
+        'Simpan nomor bot di kontak sebelum kirim !lapor pertama kali',        
         '',
         'Jadwal laporan grup ini: 2x sebulan, otomatis.',
         '',
-        '!lapor <nama>',
-        '  Kirim laporanmu (cukup nama)',
-        '  Contoh: !lapor Budi Santoso',
+        '!lapor <kode_perusahaan>, <nama>',
+        '  Contoh: !lapor kode perusahaan, nama',
         '',
         '!check',
         '  (Admin) Lihat list siapa yang sudah/belum lapor',
@@ -21,10 +21,6 @@ export default [
         '!bantuan',
         '  Tampilkan bantuan ini',
         '',
-        '*Otomatis:* kamu akan menerima DM pengingat pas jam tenggat,',
-        'dan DM pemberitahuan setelah tenggat lewat bila belum lapor.',
-        '',
-        '*Admin:* !lapor dan !check juga bisa dikirim dari DM (private chat) ke bot.',
       ]
       return reply(sock, m, lines.join('\n'))
     },

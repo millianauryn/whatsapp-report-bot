@@ -47,11 +47,15 @@ async function main() {
         () => db.get('meta', 'groups', [])
       )
     },
-    onMessage(sock, m) {
+    onMessage: async (sock, m) => {
       if (!m.message) return
 
       const jid = m.key.remoteJid
       const isGroup = jid.endsWith('@g.us')
+
+      // 🔒 BLOKIR TOTAL DM: Bot tidak menerima pesan/perintah apapun dari private chat
+      if (!isGroup) return
+
       const sender = m.key.participant || jid
 
       // Hanya layani grup allowlist — invite manual = diam total (tanpa health update / capture)
@@ -60,7 +64,7 @@ async function main() {
       // Update health check timestamp
       healthServer.updateLastMessageTime()
 
-      // Grup berkadence monthly hanya aktif 1 hari per bulan; di luar itu diam total.
+      // Di luar cycle (monthly/semimonthly): bot diam total, tidak merespons siapapun.
       if (isGroup && !time.isGroupActive(jid)) return
 
       const pushName = (m.pushName || '').trim()

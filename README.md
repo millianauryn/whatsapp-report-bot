@@ -44,8 +44,8 @@ Konten yang sama tersedia terpisah per topik di folder `docs/`:
 
 - **Jadwal per grup** — 2xsebulan otomatis (lihat alur di bawah)
 - `!lapor <nama>` untuk mengirim laporan (cukup nama)
-- `!check` (admin) untuk melihat list siapa sudah/belum lapor — tanpa DM; nama per nomor diambil dari laporan terakhir (`!lapor`), nama WhatsApp hanya sebagai isi awal bila belum pernah lapor
-- **Otomatis:** DM pengingat menjelang tenggat (default 60 menit sebelum; untuk jadwal 2xsebulan: persis jam tenggat)
+- `!check` (bisa digunakan oleh semua pengguna) untuk melihat siapa sudah/belum lapor — tanpa DM; nama per nomor diambil dari laporan terakhir (`!lapor`), nama WhatsApp hanya sebagai isi awal bila belum pernah lapor
+- **Otomatis:** recap pengingat di grup menjelang tenggat (default 60 menit sebelum; untuk jadwal 2xsebulan: persis jam tenggat)
 - **Otomatis real-time:** DM + ringkasan grup tepat saat tenggat lewat
 - Laporan setelah tenggat tetap diterima (tanpa penanda terlambat)
 - Periode baru otomatis per jadwal grup (tanpa perintah manual)
@@ -96,9 +96,9 @@ node index.js --pair 6281234567890
 |---|---|---|
 | `deadline` | `"21:00"` | Jadwal default grup: `"21:00"` = harian; `"Jumat 21:00"` = mingguan |
 | `timezone` | `"Asia/Makassar"` | Zona waktu pemantauan (WITA). Ganti sesuai kebutuhan |
-| `reminder_minutes_before` | `60` | Berapa menit sebelum tenggat DM pengingat dikirim (untuk 2xsebulan selalu pas jam tenggat) |
+| `reminder_minutes_before` | `60` | Berapa menit sebelum tenggat recap grup dikirim (untuk 2xsebulan selalu pas jam tenggat) |
 | `check_interval_seconds` | `30` | Interval pengecekan scheduler (real-time detection) |
-| `exclude_admins` | `true` | `true` = admin grup tidak wajib lapor dan tidak muncul di daftar |
+| `exclude_admins` | `false` | Admin tetap terdaftar di daftar peserta, tetapi tetap ikir tercatat di daftar "belum lapor" dan "sudah lapor" |
 | `allowed_group_links` | `[]` | Daftar link undangan grup yang diizinkan. Bot join & melayani HANYA grup dari link ini |
 | `data_file` / `auth_dir` | default | Lokasi penyimpanan |
 | `health_port` | `3000` | Port HTTP health check endpoint |
@@ -116,7 +116,7 @@ node index.js --pair 6281234567890
 
 ## Jadwal Per Grup {#jadwal-per-grup}
 
-Setiap grup terdaftar otomatis mendapat **jadwal 2xsebulan** (preset dijalankan saat bot terhubung; grup baru yang bergabung belakangan ikut dipreset). **Tidak ada perintah chat** untuk mengubahnya; reset dan pergantian periode sepenuhnya otomatis. Untuk **1x sebulan** (grup spesifik, bot aktif 1 hari/bulan): atur manual di `data.json` → `settings.groups[gid] = { "cadence": "monthly", "deadline": "5 11:30" }` — preset tidak menimpa pengaturan manual.
+Setiap grup terdaftar otomatis mendapat **jadwal 2xsebulan** (preset dijalankan saat bot terhubung; grup baru yang bergabung ikut dipreset). **Tidak ada perintah chat** untuk mengubah jadwal otomatis — setelan `data.json` tetap berl berlaku. Untuk **1x sebulan** (bot aktif hanya 1 hari/bulan di tanggal tenggat): atur manual di `data.json` → `settings.groups[gid] = { "cadence": "monthly", "deadline": "5 11:30" }` — preset tidak menimpa pengaturan manual.
 
 | Cadence | Reminder | Summary | Alert |
 |---|---|---|---|
@@ -215,7 +215,7 @@ Konfigurasi bot terbagi menjadi dua file:
   "timezone": "Asia/Makassar",
   "reminder_minutes_before": 60,
   "check_interval_seconds": 30,
-  "exclude_admins": true,
+  "exclude_admins": false,
   "allowed_group_links": [
     "https://chat.whatsapp.com/HSFrpubAAEZBBfYGYWv8cV",
     "https://chat.whatsapp.com/DICjOKwFdOj6jOInzDAnYp"
@@ -555,7 +555,7 @@ File langsung terdaftar otomatis via `src/registry.js` — tanpa mengubah file l
 ### 5. Setting Konfigurasi wajib
 - `allowed_group_links` di `config.json` tidak boleh kosong
 - `cadence` dan `deadline` di `data.json.settings.groups[gid]` sudah terisi
-- `exclude_admins: true` akan menyembunyikan admin dari daftar "belum lapor"
+- `exclude_admins: false` akan tetap terdaftar admin di daftar "belum lapor" dan "sudah lapor"
 
 ### 6. Bisa Balas Pesan DM (Private Chat)
 - User harus pernah kirim pesan pertama ke bot (baik `!lapor`, `!check`, atau sekadar `Halo`)

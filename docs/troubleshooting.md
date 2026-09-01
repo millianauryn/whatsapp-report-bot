@@ -47,7 +47,6 @@
 | `Login sebagai:` tidak muncul | Cek koneksi WA / ulangi pairing |
 | `replaced` di log | Ada instance lain — matikan satu, hapus `bot.lock` |
 | Session corrupt (stuck scan QR berulang) | Hapus `auth_info/`, pairing ulang |
-| DM reminder/alert tidak terkirim (Error 463) | Simpan nomor bot di kontak, atau pesan bot dulu untuk buat chat session |
 | Health check `degraded` | Cek `last_message_ms` null = belum ada pesan masuk; tunggu pesan masuk |
 | Queue penuh | Perbesar `queue_max_size` atau cek koneksi WA |
 | `Permission denied` saat edit data | Jangan edit manual saat bot hidup — gunakan [API](api.md) |

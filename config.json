@@ -1,10 +1,15 @@
 {
-  "deadline": "21:00",
+  "deadline": "11:30",
   "timezone": "Asia/Makassar",
   "reminder_minutes_before": 60,
   "check_interval_seconds": 30,
   "exclude_admins": true,
   "allowed_group_links": [
+<<<<<<< HEAD
+=======
+    "https://chat.whatsapp.com/HiKCQDaNWXeFRERgZFQDEa",
+    "https://chat.whatsapp.com/DICjOKwFdOj6jOInzDAnYp"
+>>>>>>> 72b0e88 (feat(docs): update documentation for group reporting and reminders; clarify admin exclusion settings)
   ],
   "data_file": "data.json",
   "auth_dir": "auth_info",

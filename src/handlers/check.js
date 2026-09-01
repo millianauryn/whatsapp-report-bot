@@ -4,7 +4,7 @@ export default [
   {
     name: 'check',
     aliases: ['ingatkan', 'pengingat'],
-    permission: 'admin',
+    permission: 'all',
     async run(sock, m, { db, time }) {
       const now = new Date()
       const groupIds = m.isGroup ? [m.jid] : db.get('meta', 'groups', [])

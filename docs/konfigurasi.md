@@ -8,7 +8,7 @@
 |---|---|---|
 | `deadline` | `"21:00"` | Jadwal default grup: `"21:00"` = harian; `"Jumat 21:00"` = mingguan |
 | `timezone` | `"Asia/Makassar"` | Zona waktu pemantauan (WITA). Ganti sesuai kebutuhan |
-| `reminder_minutes_before` | `60` | Berapa menit sebelum tenggat DM pengingat dikirim (untuk 2xsebulan selalu pas jam tenggat) |
+| `reminder_minutes_before` | `60` | Berapa menit sebelum tenggat recap grup dikirim (untuk 2xsebulan selalu pas jam tenggat) |
 | `check_interval_seconds` | `30` | Interval pengecekan scheduler (real-time detection) |
 | `exclude_admins` | `true` | `true` = admin grup tidak wajib lapor dan tidak muncul di daftar |
 | `allowed_group_links` | `[]` | Daftar link undangan grup yang diizinkan. Bot join & melayani HANYA grup dari link ini |
