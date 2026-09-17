@@ -11,6 +11,7 @@ export default [
         'Simpan nomor bot di kontak sebelum kirim !lapor pertama kali',        
         '',
         'Jadwal laporan grup ini: 2x sebulan, otomatis.',
+        'Periode laporan: (1-3) dan (15-17) setiap bulan',
         '',
         '!lapor <kode_perusahaan>, <nama>',
         '  Contoh: !lapor kode perusahaan, nama',

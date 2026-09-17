@@ -64,8 +64,15 @@ async function main() {
       // Update health check timestamp
       healthServer.updateLastMessageTime()
 
-      // Di luar cycle (monthly/semimonthly): bot diam total, tidak merespons siapapun.
-      if (isGroup && !time.isGroupActive(jid)) return
+      // Ekstrak teks & command SEBELUM cek cycle untuk !manual-lapor & !check
+      const text = bot.extractText(m)
+      const centerGroup = config.manual_lapor_group
+      const isFromCenter = isGroup && jid === centerGroup
+      const isManualLapor = text && (text.startsWith('!manual-lapor') || text.startsWith('!lapor-manual') || text.startsWith('!mlapor'))
+      const isCheck = text && text.startsWith('!check')
+
+      // Di luar cycle (monthly/semimonthly): bot diam total, KECUALI command di grup center
+      if (isGroup && !time.isGroupActive(jid) && !isFromCenter && !isManualLapor) return
 
       const pushName = (m.pushName || '').trim()
 
@@ -73,7 +80,6 @@ async function main() {
       // mengisi bila belum ada nama tersimpan (tidak pernah menimpa).
       bot.captureName(db, sender, m.pushName)
 
-      const text = bot.extractText(m)
       if (!text || !text.startsWith(COMMAND_PREFIX)) return
 
       // Pesan fromMe (dari HP nomor bot) hanya diproses bila berupa perintah.

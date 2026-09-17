@@ -88,6 +88,7 @@ export function validateConfig(raw) {
     weekly_summary_time: timeOfDay(raw.weekly_summary_time, '17:00'),
     monthly_reminder_at_deadline: bool(raw.monthly_reminder_at_deadline, true),
     monthly_summary_time: timeOfDay(raw.monthly_summary_time, '17:00'),
+    manual_lapor_group: raw.manual_lapor_group || '',
   }
 }
 

@@ -3,13 +3,11 @@
   "timezone": "Asia/Makassar",
   "reminder_minutes_before": 60,
   "check_interval_seconds": 30,
-  "exclude_admins": true,
+  "exclude_admins": false,
   "allowed_group_links": [
-<<<<<<< HEAD
-=======
+    "https://chat.whatsapp.com/DICjOKwFdOj6jOInzDAnYp",
     "https://chat.whatsapp.com/HiKCQDaNWXeFRERgZFQDEa",
-    "https://chat.whatsapp.com/DICjOKwFdOj6jOInzDAnYp"
->>>>>>> 72b0e88 (feat(docs): update documentation for group reporting and reminders; clarify admin exclusion settings)
+    "https://chat.whatsapp.com/KKSAKtAIW4C7dC3ozzW54y"
   ],
   "data_file": "data.json",
   "auth_dir": "auth_info",
@@ -24,5 +22,6 @@
   "weekly_reminder_at_deadline": true,
   "weekly_summary_time": "17:00",
   "monthly_reminder_at_deadline": true,
-  "monthly_summary_time": "17:00"
+  "monthly_summary_time": "17:00",
+  "manual_lapor_group": "120363409120673951@g.us"
 }

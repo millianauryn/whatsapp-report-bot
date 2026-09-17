@@ -35,7 +35,7 @@ FAILBACK : kebalikannya (stop Linux → salin data kembali → start service Win
 | `auth_info/` | **Sesi WhatsApp terenkripsi** — bawa agar **tidak perlu scan QR ulang** |
 | `docs/`, `windows/` | Dokumentasi + skrip |
 
-**Tinggalkan:** `node_modules/` (install ulang), `backups/`, `queue.jsonl`, `bot.lock`, `whatsapp-report-*.service`, `whatsapp-report-*.timer`, `backup.sh`
+**Tinggalkan:** `node_modules/` (install ulang), `backups/`, `queue.jsonl`, `whatsapp-report-*.service`, `whatsapp-report-*.timer`, `backup.sh`
 
 ## 3. Langkah Migrasi
 
@@ -146,7 +146,7 @@ data.json
 backups/
 logs/
 queue.jsonl
-bot.lock
+
 *.log
 ```
 

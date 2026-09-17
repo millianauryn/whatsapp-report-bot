@@ -1,4 +1,5 @@
 import { reply, groupMeta, botJidOf, nonReporters, sendText, memberParticipants, reportListLines, getBotIdentifiers } from '../bot.js'
+import { config } from '../config.js'
 
 export default [
   {
@@ -7,7 +8,17 @@ export default [
     permission: 'all',
     async run(sock, m, { db, time }) {
       const now = new Date()
-      const groupIds = m.isGroup ? [m.jid] : db.get('meta', 'groups', [])
+      const centerGroup = config.manual_lapor_group
+      const isCenterGroup = m.isGroup && m.jid === centerGroup
+
+      // Jika dari grup center: periksa SEMUA grup terdaftar
+      // Jika dari grup lain: periksa HANYA grup tersebut
+      // Jika dari DM: periksa SEMUA grup
+      const allGroups = db.get('meta', 'groups', [])
+      const groupIds = isCenterGroup 
+        ? allGroups
+        : (m.isGroup ? [m.jid] : allGroups)
+
       if (groupIds.length === 0) {
         return reply(sock, m, 'Belum ada grup yang terdaftar. Tambahkan bot ke grup lewat link undangan yang diizinkan (config.allowed_group_links).')
       }
@@ -16,20 +27,21 @@ export default [
       const parts = []
 
       for (const gid of groupIds) {
-        let meta
+        let meta = null
         try {
           meta = await groupMeta(sock, gid, true)
-        } catch {
-          continue
+        } catch (e) {
+          // Fallback jika gagal fetch metadata grup
+          meta = { subject: gid, participants: [] }
         }
 
         const schedule = time.groupSchedule(gid)
         const state = time.scheduleState(now, schedule)
         const lines = []
-        if (groupIds.length > 1) {
-          lines.push(`*Grup: ${meta.subject || gid}*`)
-          lines.push('')
-        }
+        
+        const groupTitle = meta?.subject ? `${meta.subject} (${gid.split('@')[0]})` : gid
+        lines.push(`*📋 Grup: ${groupTitle}*`)
+        lines.push('')
 
         if (!state) {
           const next = time.nextPeriodInfo(now, schedule)
@@ -42,11 +54,14 @@ export default [
         }
 
         const reports = db.get('reports', state.periodId, {})[gid] || {}
-        const due = nonReporters(myJid, meta, reports, botLid)
-        const memberIds = new Set(memberParticipants(meta, myJid, botLid).map((p) => p.id))
-        const done = Object.entries(reports)
-          .filter(([jid]) => memberIds.has(jid))
-          .map(([, r]) => r)
+        const due = meta ? nonReporters(myJid, meta, reports, botLid) : []
+        
+        // Ambil semua yang sudah lapor dari database (termasuk input manual)
+        const done = Object.entries(reports).map(([jid, r]) => ({
+          jid,
+          name: r.name || db.get('names', jid, '') || jid.split('@')[0],
+          late: r.late
+        }))
 
         lines.push(`*Cek Laporan - Periode ${state.periodLabel}*`)
         lines.push(`Jadwal: ${time.describeSchedule(schedule)}`)
@@ -61,9 +76,15 @@ export default [
         return reply(sock, m, 'Tidak ada grup yang dapat diakses.')
       }
 
-      for (const r of parts) {
-        // List saja, tanpa mention dan tanpa DM.
-        await sendText(sock, r.gid, r.lines.join('\n'), m.jid === r.gid ? m : undefined)
+      if (isCenterGroup) {
+        // Jika dari grup center, gabungkan semua hasil dan kirim HANYA ke grup center
+        const fullMessage = parts.map(p => p.lines.join('\n')).join('\n\n━━━━━━━━━━━━━━━━━━━━\n\n')
+        await reply(sock, m, fullMessage)
+      } else {
+        // Kirim ke masing-masing grup seperti biasa
+        for (const r of parts) {
+          await sendText(sock, r.gid, r.lines.join('\n'), m.jid === r.gid ? m : undefined)
+        }
       }
     },
   },

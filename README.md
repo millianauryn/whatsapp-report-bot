@@ -84,7 +84,7 @@ node index.js --pair 6281234567890
   !lapor Budi Santoso
   ```
 
-> **Penting:** hanya boleh **satu** instance bot berjalan sekaligus. `index.js` memakai file kunci `bot.lock` — jika instance kedua dijalankan, bot akan menolak dengan pesan `[lock]`. Jika dijalankan sebagai service, jangan jalankan `node index.js` manual di sampingnya (bisa memicu konflik sesi WhatsApp `replaced`).
+> **Hanya boleh satu instance bot berjalan sekaligus.** Jika dijalankan dua proses `node index.js` sekaligus dengan session yang sama, WhatsApp akan menutup koneksi salah satunya (error `replaced`). Gunakan pengelola proses (systemd, pm2) atau hentikan satu instance sebelum memulai yang lain.
 
 > **Pengendali bot = admin grup.** Perintah `!check` bisa dipakai admin grup di dalam grup, maupun dari DM ke bot. Pesan `fromMe` (dikirim dari HP nomor bot sendiri, diawali `!`) juga tetap diproses — balasan otomatis bot tidak pernah diawali `!`, jadi aman dari loop.
 
@@ -571,7 +571,7 @@ File langsung terdaftar otomatis via `src/registry.js` — tanpa mengubah file l
 |---|---|
 | `!lapor` diblok (`⏸️`) | Luar jadwal (tgl 5–14, 19–31). Cek `!bantuan` |
 | `Login sebagai:` tidak muncul | Cek koneksi WA / ulangi pairing |
-| `replaced` di log | Ada instance lain — matikan satu, hapus `bot.lock` |
+| `replaced` di log | Ada instance lain — matikan satu, hapus file sesi (`auth_info/`) untuk login ulang |
 | Session corrupt (stuck scan QR berulang) | Hapus `auth_info/`, pairing ulang |
 | DM reminder/alert tidak terkirim (Error 463) | Simpan nomor bot di kontak, atau pesan bot dulu untuk buat chat session |
 | Health check `degraded` | Cek `last_message_ms` null = belum ada pesan masuk; tunggu pesan masuk |

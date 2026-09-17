@@ -45,7 +45,7 @@
 |---|---|
 | `!lapor` diblok (`⏸️`) | Luar jadwal (tgl 5–14, 19–31). Cek `!bantuan` |
 | `Login sebagai:` tidak muncul | Cek koneksi WA / ulangi pairing |
-| `replaced` di log | Ada instance lain — matikan satu, hapus `bot.lock` |
+| `replaced` di log | Ada instance lain — matikan satu, hapus file sesi (`auth_info/`) untuk login ulang |
 | Session corrupt (stuck scan QR berulang) | Hapus `auth_info/`, pairing ulang |
 | Health check `degraded` | Cek `last_message_ms` null = belum ada pesan masuk; tunggu pesan masuk |
 | Queue penuh | Perbesar `queue_max_size` atau cek koneksi WA |
